@@ -1,0 +1,75 @@
+name: release
+
+# Release workflow. On-tag trigger: builds wheels + sdists for both the
+# server and the generated client, runs the drift gate first so a drifted
+# client cannot ship, then attaches all four artifacts to the GitHub
+# Release with git-cliff-generated notes.
+#
+# Git-fetch friendly: consumers can also pin via
+#   git+https://github.com/FloHofstetter/soyuz-catalog.git@vX.Y.Z#subdirectory=soyuz-catalog-client
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write  # for `gh release create`
+
+jobs:
+  release:
+    name: build + publish release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # git-cliff needs full history
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.14
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Fail if soyuz-catalog-client drifts from /openapi.json
+        run: bash scripts/check_client_drift.sh
+
+      - name: Build server wheel + sdist
+        run: uv build
+
+      - name: Build client wheel + sdist
+        working-directory: soyuz-catalog-client
+        run: uv build
+
+      - name: Generate release notes
+        run: |
+          uvx --from git-cliff git-cliff \
+            --latest \
+            --strip all \
+            --output RELEASE_NOTES.md
+          echo "--- RELEASE_NOTES.md ---"
+          cat RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # PEP 440 prerelease shapes: …rcN, …aN, …bN, …devN, …postN.
+          # GitHub does not auto-detect these, so flag manually.
+          PRERELEASE_FLAG=""
+          case "${GITHUB_REF_NAME}" in
+              *rc*|*a[0-9]*|*b[0-9]*|*dev[0-9]*) PRERELEASE_FLAG="--prerelease" ;;
+          esac
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file RELEASE_NOTES.md \
+            ${PRERELEASE_FLAG} \
+            dist/*.whl \
+            dist/*.tar.gz \
+            soyuz-catalog-client/dist/*.whl \
+            soyuz-catalog-client/dist/*.tar.gz

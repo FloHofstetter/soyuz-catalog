@@ -1,0 +1,150 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "soyuz-catalog"
+version = "0.2.0rc4"
+description = "A clean Python reference implementation of the Unity Catalog REST API spec."
+license = "Apache-2.0"
+readme = "README.md"
+keywords = ["unity-catalog", "metadata", "fastapi", "delta-lake", "data-catalog"]
+authors = [
+    { name = "Florian Hofstetter", email = "flo.max.hofstetter@gmail.com" },
+]
+requires-python = ">=3.14"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Database",
+]
+dependencies = [
+    "fastapi>=0.135",
+    "uvicorn[standard]>=0.42",
+    "sqlalchemy>=2.0",
+    "alembic>=1.15",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.0",
+    "python-multipart>=0.0.26",
+]
+
+[project.optional-dependencies]
+postgres = [
+    "psycopg[binary]>=3.2",
+]
+delta = [
+    "deltalake>=1.5",
+    "pyarrow>=21.0",
+]
+spark = [
+    "pyspark>=3.5,<4.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0",
+    "pytest-cov>=6.0",
+    "httpx>=0.28",
+    "ruff>=0.15",
+    "pyright>=1.1",
+    "hatchling>=1.29.0",
+    "pydoclint>=0.8",
+    "pre-commit>=4.0",
+    "detect-secrets>=1.5",
+    "bandit>=1.9.4",
+    "pip-audit>=2.10.0",
+    "deltalake>=1.5",
+    "pyarrow>=21.0",
+    "unitycatalog>=0.0.1a0",
+    "psycopg[binary]>=3.2",
+    "pyyaml>=6.0",
+    "hypercorn[h2]>=0.18.0",
+    "openapi-python-client>=0.28.3",
+    "soyuz-catalog-client",
+]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.6",
+    "mkdocstrings[python]>=0.29",
+]
+
+[project.urls]
+Homepage = "https://github.com/FloHofstetter/soyuz-catalog"
+Repository = "https://github.com/FloHofstetter/soyuz-catalog"
+Issues = "https://github.com/FloHofstetter/soyuz-catalog/issues"
+
+[tool.hatch.build.targets.sdist]
+include = ["soyuz_catalog", "LICENSE", "README.md"]
+
+[tool.uv.workspace]
+members = ["soyuz-catalog-client"]
+
+[tool.uv.sources]
+soyuz-catalog-client = { workspace = true }
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+# soyuz-catalog-client/ is a generated openapi-python-client subpackage
+# (ADR-0007). Its ruff posture is pinned inside the generator via
+# `.openapi-python-client.yaml` post_hooks so the drift check stays
+# reproducible; the root lint run must not re-format it.
+extend-exclude = ["soyuz-catalog-client/soyuz_catalog_client"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "D"]
+pydocstyle.convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
+# The generated openapi-python-client emits one module per path-method
+# combination with operationId-derived names like
+# ``get_permissions_api_2_1_unity_catalog_permissions_securable_type_full_name_get``.
+# The integration test that drives the generated client has to import
+# from those modules; the import lines are unavoidably longer than 100
+# chars because the module name alone exceeds the budget.
+"tests/test_generated_client_roundtrip.py" = ["D", "E501"]
+"soyuz_catalog/alembic/versions/**" = ["D"]
+
+[tool.pyright]
+pythonVersion = "3.14"
+typeCheckingMode = "standard"
+include = ["soyuz_catalog", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not integration and not postgres'"
+markers = [
+    "integration: end-to-end tests against a live uvicorn server (deselected by default; run with `pytest -m integration`)",
+    "postgres: rerun unit tests against a real Postgres (deselected by default; run with `pytest -m postgres --db-backend=postgres` after `docker compose up -d postgres`)",
+]
+
+[tool.coverage.run]
+source = ["soyuz_catalog"]
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.pydoclint]
+style = "google"
+skip-checking-short-docstrings = false
+# Many service functions delegate IntegrityError → ConflictError
+# translation to `soyuz_catalog.db.commit_or_conflict`, so the body
+# has no literal ``raise`` even though the function legitimately
+# raises ConflictError on a unique-index collision. The Raises
+# sections are still semantically accurate; turn off the
+# "Raises section without raise statement" consistency check so
+# pydoclint does not flag these CM-mediated exceptions.
+skip-checking-raises = true
+check-arg-order = true
+check-return-types = true
+check-class-attributes = false
+check-style-mismatch = true
+arg-type-hints-in-docstring = false
+arg-type-hints-in-signature = true
+require-return-section-when-returning-nothing = false
+allow-init-docstring = false
+exclude = '\.venv/|tests/|soyuz_catalog/alembic/versions/'

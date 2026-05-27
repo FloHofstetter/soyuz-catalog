@@ -1,0 +1,57 @@
+# git-cliff configuration — https://git-cliff.org/docs/configuration
+#
+# Drives `scripts/bump-version.sh` (lockstep version + changelog) and the
+# `release.yml` GitHub workflow (release-notes body). Keyed to the
+# Conventional Commit scopes in use on main (`feat(tables)`,
+# `feat(connections)`, `fix(client)`, …). Output shape preserves the
+# Keep-a-Changelog heading that opens CHANGELOG.md.
+
+[changelog]
+header = """
+# Changelog
+
+All notable changes to soyuz-catalog are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/),
+and this project adheres to [Semantic Versioning](https://semver.org/).
+
+"""
+body = """
+{% if version -%}
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{%- else -%}
+## [Unreleased]
+{%- endif %}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+{% for commit in commits %}
+- `{{ commit.message | split(pat="\\n") | first | upper_first | trim }}`{% if commit.id %} ({{ commit.id | truncate(length=7, end="") }}){% endif %}
+{%- endfor %}
+{% endfor %}
+"""
+footer = ""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+commit_parsers = [
+    { message = "^feat", group = "Features" },
+    { message = "^fix", group = "Bug Fixes" },
+    { message = "^docs", group = "Documentation" },
+    { message = "^perf", group = "Performance" },
+    { message = "^refactor", group = "Refactor" },
+    { message = "^test", group = "Tests" },
+    { message = "^chore\\(release\\)", skip = true },
+    { message = "^chore", group = "Chores" },
+    { message = "^ci", group = "CI" },
+    { body = ".*\\[skip changelog\\]", skip = true },
+    { message = "^Merge", skip = true },
+]
+filter_commits = false
+tag_pattern = "v[0-9]*"
+skip_tags = ""
+ignore_tags = ""
+topo_order = false
+sort_commits = "oldest"

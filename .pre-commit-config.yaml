@@ -1,0 +1,169 @@
+# Install: uv run pre-commit install --hook-type pre-commit --hook-type pre-push --hook-type commit-msg
+# Run all hooks against the full repo: uv run pre-commit run --all-files
+#
+# Fast checks run on every commit; slow checks (pip-audit, bandit, mkdocs)
+# run only on `git push` via the pre-push stage.
+
+default_language_version:
+  python: python3.14
+
+default_stages: [pre-commit]
+
+repos:
+  # ── Standard file hygiene ──────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--unsafe]  # mkdocs.yml uses !!python/name: tags
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: detect-private-key
+
+  # ── Ruff: lint + format ────────────────────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.0  # keep in sync with pyproject.toml [dependency-groups].dev
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  # ── YAML linting (beyond syntax) ───────────────────────────────────
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        args: [-c, .yamllint.yaml]
+
+  # ── Markdown linting ───────────────────────────────────────────────
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.14.0
+    hooks:
+      - id: markdownlint-cli2
+        args: [--config, .markdownlint.yaml]
+        exclude: ^(site/|dist/|node_modules/)
+
+  # ── Conventional Commits (commit message linting) ──────────────────
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args:
+          - --strict
+          - feat
+          - fix
+          - docs
+          - style
+          - refactor
+          - perf
+          - test
+          - build
+          - ci
+          - chore
+          - revert
+
+  # ── GitHub Actions workflow validation ─────────────────────────────
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.4
+    hooks:
+      - id: actionlint
+
+  # ── Secret scanning ────────────────────────────────────────────────
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+        exclude: ^\.secrets\.baseline$
+
+  # ── Local hooks (need project env for uv run) ──────────────────────
+  - repo: local
+    hooks:
+      - id: pyright
+        name: pyright
+        entry: uv run pyright
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: pydoclint
+        name: pydoclint
+        entry: uv run pydoclint
+        language: system
+        types: [python]
+        files: ^soyuz_catalog/
+        exclude: ^soyuz_catalog/alembic/versions/
+        stages: [pre-commit]
+
+      - id: pytest
+        name: pytest
+        entry: uv run pytest -q
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: changelog-required
+        name: changelog required for source changes
+        entry: uv run python scripts/check_changelog.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
+      - id: adr-format
+        name: ADR format check
+        entry: uv run python scripts/check_adr_format.py
+        language: system
+        files: ^docs/adr/.*\.md$
+        stages: [pre-commit]
+
+      - id: docstring-depth
+        name: docstring depth (informational)
+        entry: uv run python scripts/check_docstring_depth.py
+        language: system
+        files: ^soyuz_catalog/.*\.py$
+        exclude: ^soyuz_catalog/alembic/versions/
+        verbose: true
+        stages: [pre-commit]
+
+      - id: pip-audit
+        name: pip-audit
+        # TODO(2026-Q3): drop --ignore-vuln once a pip > 26.0.1 ships
+        # the CVE-2026-3219 fix (no fix release at 2026-04-26). pip is
+        # the bundled installer, not a runtime dep — re-audit the
+        # moment an upstream release lands.
+        entry: uv run pip-audit --ignore-vuln CVE-2026-3219
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: bandit
+        name: bandit
+        entry: uv run bandit -r soyuz_catalog -ll -q
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: client-drift
+        name: soyuz-catalog-client drift
+        entry: bash scripts/check_client_drift.sh
+        language: system
+        pass_filenames: false
+        files: ^(soyuz_catalog/api/|soyuz-catalog-client/soyuz_catalog_client/|\.openapi-python-client\.yaml|scripts/regen_client\.sh|scripts/dump_openapi\.py)
+        stages: [pre-push]
+
+      - id: mkdocs-build-strict
+        name: mkdocs build --strict
+        entry: uv run --group docs mkdocs build --strict --site-dir /tmp/soyuz-mkdocs-strict
+        language: system
+        pass_filenames: false
+        files: ^(docs/|mkdocs\.yml|soyuz_catalog/.*\.py)$
+        stages: [pre-push]

@@ -1,0 +1,42 @@
+# markdownlint-cli2 config — disables noisy rules that conflict with our
+# docs prose style. Keeps the rules that catch real bugs.
+
+default: true
+
+# Line length: natural prose wrapping, no hard 80-char limit.
+MD013: false
+
+# Inline HTML: mkdocs-material uses admonitions + occasional html.
+MD033: false
+
+# First line heading: not all docs start with H1.
+MD041: false
+
+# Bare URLs: fine in CHANGELOG and code blocks.
+MD034: false
+
+# Ordered list prefix: allow both "1. 1. 1." and "1. 2. 3.".
+MD029: false
+
+# Fenced code block language: not always required for short snippets.
+MD040: false
+
+# Duplicate headings: allow under different parents.
+MD024:
+  siblings_only: true
+
+# Code-block style: fenced and indented are both fine.
+MD046: false
+
+# Blanks around tables / headings: not structurally important.
+MD022: false
+MD058: false
+
+# Blank lines inside blockquotes: mkdocs-material admonitions.
+MD028: false
+
+# Emphasis used as a heading: walkthroughs use **Action** / **Expect**
+# labels as structural markers; troubleshooting uses **Symptom** /
+# **Cause** / **Fix**. They are labels, not headings — promoting them
+# to actual H4s would make the TOC noisy and skip heading levels.
+MD036: false

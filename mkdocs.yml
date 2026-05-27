@@ -1,0 +1,164 @@
+site_name: soyuz-catalog
+site_url: https://flohofstetter.github.io/soyuz-catalog/
+site_description: A clean Python reference implementation of the Unity Catalog REST API spec.
+site_author: Florian Hofstetter
+repo_url: https://github.com/FloHofstetter/soyuz-catalog
+repo_name: FloHofstetter/soyuz-catalog
+edit_uri: edit/main/docs/
+
+copyright: Copyright &copy; 2026 Florian Hofstetter — Apache 2.0
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: deep orange
+      accent: deep orange
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: deep orange
+      accent: deep orange
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+  icon:
+    repo: fontawesome/brands/github
+
+  features:
+    - navigation.instant
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+
+extra_css:
+  - stylesheets/hero.css
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_if_no_docstring: false
+            show_source: false
+            show_root_heading: true
+            show_root_full_path: false
+            members_order: source
+            merge_init_into_class: true
+            show_signature_annotations: true
+            separate_signature: true
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+      - First catalog: getting-started/first-catalog.md
+  - Concepts:
+      - Overview: concepts/index.md
+      - Origin and relationship to Unity Catalog: concepts/origin.md
+      - Architecture: concepts/architecture.md
+      - Spec is the contract: concepts/spec-is-the-contract.md
+      - Securables and naming: concepts/securables-and-naming.md
+      - Permissions model: concepts/permissions-model.md
+      - Extensions over the spec: concepts/extensions-over-spec.md
+      - Table constraints: concepts/table-constraints.md
+      - Lineage: concepts/lineage.md
+      - Audit log: concepts/audit-log.md
+      - Delta commit handling: concepts/delta-commits.md
+      - Volume files: concepts/volume-files.md
+      - Credentials: concepts/credentials.md
+      - Pagination: concepts/pagination.md
+      - Stack and interchangeability: concepts/stack.md
+  - Guides:
+      - Overview: guides/index.md
+      - Backing soyuz with Postgres: guides/backing-with-postgres.md
+      - Migrations with Alembic: guides/migrations.md
+      - Backup and restore: guides/backup-restore.md
+      - Troubleshooting and FAQ: guides/troubleshooting.md
+      - HTTP walkthroughs:
+          - Catalog → schema → table: guides/walkthroughs/catalog-schema-table.md
+          - Attaching tags: guides/walkthroughs/tags.md
+          - Declared table constraints: guides/walkthroughs/declared-constraints.md
+          - Posting and traversing lineage: guides/walkthroughs/lineage.md
+          - Posting a Delta commit: guides/walkthroughs/delta-commit.md
+          - Grants and effective permissions: guides/walkthroughs/grants-and-effective.md
+          - Querying the audit log: guides/walkthroughs/audit-log.md
+          - Foreign catalog from a connection: guides/walkthroughs/foreign-catalog.md
+          - Files API on a volume: guides/walkthroughs/volume-files.md
+  - Admin:
+      - Overview: admin/index.md
+      - Deployment: admin/deployment.md
+      - Backends (SQLite vs Postgres): admin/backends.md
+      - Configuration: admin/configuration.md
+      - Observability and audit log: admin/observability.md
+  - Integrations:
+      - Overview: integrations/index.md
+      - Apache Spark: integrations/spark.md
+      - delta-rs and python-delta: integrations/delta-rs.md
+      - MLflow Tracking: integrations/mlflow.md
+      - Python SDK (generated client): integrations/python-sdk.md
+      - JVM unitycatalog client: integrations/jvm-client.md
+  - Reference:
+      - REST API: reference/api.md
+      - UC spec coverage map: reference/spec-coverage.md
+      - UC OSS compatibility: reference/uc-oss-compatibility.md
+      - Settings: reference/settings.md
+      - Python API:
+          - Services: reference/python/services.md
+          - Models: reference/python/models.md
+          - Schemas: reference/python/schemas.md
+  - Divergences: divergences.md
+  - Decisions:
+      - Index: adr/README.md
+      - Template: adr/0000-template.md
+      - 0001 — Stack and conventions: adr/0001-stack-and-conventions.md
+      - 0002 — Spec is the contract: adr/0002-spec-is-the-contract.md
+      - 0003 — Keyset pagination: adr/0003-keyset-pagination.md
+      - 0004 — Postgres backend: adr/0004-postgres-as-supported-backend.md
+      - 0005 — Permissions without enforcement: adr/0005-permissions-without-enforcement.md
+      - 0006 — Coordinated commits — no coordinator: adr/0006-coordinated-commits.md
+      - 0007 — Generated client over hand-written SDK: adr/0007-generated-client-over-hand-written-sdk.md
+      - 0008 — OpenLineage as lineage contract: adr/0008-openlineage-as-lineage-contract.md
+      - 0009 — Delta REST Catalog as secondary surface: adr/0009-delta-rest-catalog-as-secondary-surface.md
+      - 0010 — Tags as an extension: adr/0010-tags-as-extension.md
+      - 0011 — Delta commit coordinator — passthrough: adr/0011-delta-commit-coordinator.md
+      - 0012 — Table constraints: adr/0012-table-constraints.md
+      - 0013 — Connections and foreign catalogs: adr/0013-connections-and-foreign-catalogs.md
+  - Development:
+      - Contributing: development/contributing.md
+  - Changelog: changelog.md

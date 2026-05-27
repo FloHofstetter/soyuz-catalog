@@ -1,0 +1,49 @@
+name: Feature request
+description: Suggest a new capability or spec extension for soyuz-catalog.
+title: "[feat] "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature requests for soyuz-catalog fall into two buckets:
+
+        1. **Spec-conformant additions** — endpoints that are in
+           `unitycatalog/api/all.yaml` but not yet implemented.
+        2. **Over-the-spec extensions** — capabilities outside the
+           UC spec (lineage, tags, effective permissions, etc.).
+           These need stronger motivation since they widen the
+           contract.
+
+        Please indicate which bucket the request falls into below.
+
+  - type: dropdown
+    id: bucket
+    attributes:
+      label: Request bucket
+      options:
+        - Spec-conformant addition (cite the all.yaml section)
+        - Over-the-spec extension (extends the API surface)
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What downstream consumer is blocked, and on what?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What endpoints / request bodies / response shapes would change?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

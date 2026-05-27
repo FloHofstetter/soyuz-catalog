@@ -1,0 +1,124 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: unit (sqlite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.14
+      - name: Install dependencies
+        run: uv sync --group dev
+      - name: Ruff
+        run: uv run ruff check .
+      - name: Pyright
+        run: uv run pyright
+      - name: Pytest (sqlite)
+        run: uv run pytest
+
+  postgres:
+    name: unit (postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: soyuz
+          POSTGRES_PASSWORD: soyuz  # pragma: allowlist secret
+          POSTGRES_DB: soyuz
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U soyuz -d soyuz"
+          --health-interval=2s
+          --health-timeout=3s
+          --health-retries=20
+    env:
+      SOYUZ_TEST_POSTGRES_URL: postgresql+psycopg://soyuz:soyuz@localhost:5432/soyuz  # pragma: allowlist secret
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.14
+      - name: Install dependencies (with postgres extra)
+        run: uv sync --group dev --extra postgres
+      - name: Pytest (--db-backend=postgres, full unit suite)
+        run: uv run pytest --db-backend=postgres -m "not integration"
+
+  client-drift:
+    name: client drift (generated SDK)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.14
+      - name: Install dependencies
+        run: uv sync --group dev
+      - name: Fail if soyuz-catalog-client drifts from /openapi.json
+        run: bash scripts/check_client_drift.sh
+
+  integration-client:
+    name: integration (generated client)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.14
+      - name: Install dependencies
+        run: uv sync --group dev
+      - name: Pytest (generated-client integration round-trips)
+        run: uv run pytest -m integration tests/test_generated_client_roundtrip.py -v
+
+  integration-spark:
+    name: integration (spark)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.14
+      - name: Set up Java (Temurin 17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install dependencies (with spark + delta extras)
+        run: uv sync --group dev --extra spark --extra delta
+      - name: Cache Ivy jars
+        uses: actions/cache@v4
+        with:
+          path: ~/.ivy2
+          key: ivy-${{ runner.os }}-delta-4.0.0-uc-0.3.0
+          restore-keys: |
+            ivy-${{ runner.os }}-
+      - name: Pytest (Spark round-trip smoke test)
+        run: uv run pytest -m integration tests/test_spark_roundtrip.py -v

@@ -1,0 +1,73 @@
+name: spec-drift
+
+# Spec-drift tracking. Runs weekly, fetches upstream UC `all.yaml`, diffs
+# against the committed baseline at `tests/data/uc_spec_baseline.json`,
+# and opens (or updates) a GitHub issue whenever upstream has grown new
+# paths, methods, or schemas. The review loop is: maintainer triages the
+# issue, regenerates the baseline via
+# `uv run python scripts/check_spec_drift.py --spec … --write-baseline`,
+# commits the refreshed snapshot. Committing the new baseline is what
+# closes the drift out on the next scheduled run.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: spec-drift
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: check upstream spec drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.14
+      - name: Install dependencies
+        run: uv sync --group dev
+      - name: Fetch upstream all.yaml
+        run: |
+          curl -fsSL \
+            https://raw.githubusercontent.com/unitycatalog/unitycatalog/main/api/all.yaml \
+            -o /tmp/uc-all.yaml
+      - name: Run drift checker
+        id: drift
+        continue-on-error: true
+        run: |
+          set +e
+          uv run python scripts/check_spec_drift.py --spec /tmp/uc-all.yaml > /tmp/drift.md
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+      - name: Fail if checker errored
+        if: steps.drift.outputs.exit_code == '2'
+        run: |
+          echo "spec-drift checker exited 2 — fetch or parse failure" >&2
+          cat /tmp/drift.md || true
+          exit 1
+      - name: Open or update drift issue
+        if: steps.drift.outputs.exit_code == '1'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          title="Upstream UC spec drift detected"
+          existing=$(gh issue list --label spec-drift --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --body-file /tmp/drift.md
+            gh issue comment "$existing" --body "Refreshed by scheduled run $(date -u +%FT%TZ)."
+          else
+            gh issue create \
+              --title "$title" \
+              --label spec-drift \
+              --body-file /tmp/drift.md
+          fi

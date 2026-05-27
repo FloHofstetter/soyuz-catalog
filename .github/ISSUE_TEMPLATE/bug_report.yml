@@ -1,0 +1,89 @@
+name: Bug report
+description: A defect, regression, or spec divergence in soyuz-catalog.
+title: "[bug] "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report. Please give
+        us enough detail to reproduce locally.
+
+        **Security vulnerabilities should NOT be filed here** — see
+        [SECURITY.md](../../SECURITY.md) for the responsible-disclosure
+        process.
+
+  - type: input
+    id: version
+    attributes:
+      label: soyuz-catalog version
+      description: Output of `uv run soyuz-catalog --version` or the docker image tag.
+      placeholder: "v0.3.0rc1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-mode
+    attributes:
+      label: Installation mode
+      options:
+        - Docker compose (GHCR pull)
+        - Docker compose (local build)
+        - Source checkout + uv sync
+        - As a downstream dependency from another repo
+    validations:
+      required: true
+
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Database backend
+      options:
+        - SQLite (default)
+        - Postgres
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include the exact HTTP request (curl, httpie, or generated-client call).
+      placeholder: |
+        1. Start a fresh server: `uv run soyuz-catalog`
+        2. `curl -X POST http://127.0.0.1:8080/api/2.1/unity-catalog/catalogs -d '{"name":"x"}'`
+        3. Then `curl -X PATCH ...`
+        4. Observe …
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: If this is a spec divergence, cite the relevant `unitycatalog/api/all.yaml` section.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include the HTTP response body and status code.
+    validations:
+      required: true
+
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      placeholder: |
+        - Python: 3.14.0
+        - OS: Manjaro 6.12 / macOS 14.4 / Ubuntu 22.04
+        - DB: SQLite / Postgres 16
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      render: shell

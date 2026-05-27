@@ -1,0 +1,21 @@
+# Generator config for the soyuz-catalog-client subpackage.
+#
+# Consumed by `just regen-client` (and the CI `client-drift` job) via
+# `openapi-python-client generate --config .openapi-python-client.yaml
+#  --meta=none --output-path soyuz-catalog-client`.
+#
+# `--meta=none` means the generator only writes the
+# `soyuz_catalog_client/` package directory — `pyproject.toml` and
+# `README.md` under `soyuz-catalog-client/` are hand-maintained and
+# outside the drift check. ADR-0007 records why.
+project_name_override: soyuz-catalog-client
+package_name_override: soyuz_catalog_client
+use_path_prefixes_for_title_model_names: false
+# Pin post_hooks explicitly so the drift check is reproducible across
+# local dev and CI. ruff runs in `--isolated` mode so it ignores the
+# root `pyproject.toml` ruff config (different line-length, different
+# lint rule set) that the generator's output was never meant to live
+# under.
+post_hooks:
+  - "ruff check --isolated --select=I --fix-only ."
+  - "ruff format --isolated ."

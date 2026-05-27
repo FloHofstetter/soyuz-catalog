@@ -1,0 +1,115 @@
+/* Hero banner for docs/index.md.
+ *
+ * Uses native mkdocs-material primitives: no theme override, no JS, no extra
+ * dependency. The hero is a constrained block at article width with a
+ * left-to-right dark gradient overlay so the title remains legible against
+ * the image's busier right two-thirds.
+ */
+
+.soyuz-hero {
+  position: relative;
+  margin: -1rem 0 2.5rem;
+  padding: clamp(1.5rem, 5vw, 4rem) clamp(1.5rem, 4vw, 3rem);
+  background-image:
+    linear-gradient(
+      to right,
+      rgba(0, 0, 0, 0.72) 0%,
+      rgba(0, 0, 0, 0.45) 30%,
+      rgba(0, 0, 0, 0.12) 58%,
+      rgba(0, 0, 0, 0) 80%
+    ),
+    url("../assets/hero.webp");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border-radius: 0.75rem;
+  /* Match the hero PNG's native 1024:434 ratio so the full image fits
+   * inside the article width without cropping the left-third negative
+   * space we designed for the headline overlay. */
+  aspect-ratio: 1024 / 434;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  color: #fff;
+  isolation: isolate;
+}
+
+.soyuz-hero h1 {
+  color: #fff;
+  font-size: clamp(2rem, 4.5vw, 3.4rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.65rem;
+  padding: 0;
+  border: 0;
+  line-height: 1.05;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
+}
+
+.soyuz-hero p {
+  font-size: clamp(0.95rem, 1.4vw, 1.15rem);
+  max-width: 34rem;
+  line-height: 1.5;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.94);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+}
+
+.soyuz-hero a {
+  color: #ffab40;
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.18em;
+}
+
+.soyuz-hero a:hover {
+  color: #ffd180;
+}
+
+/* On narrow viewports the right-side spacecraft would be cropped away.
+ * Re-anchor the background so the Soyuz stays visible behind the gradient.
+ */
+@media (max-width: 600px) {
+  .soyuz-hero {
+    background-position: 72% center;
+    min-height: 200px;
+    padding: 1.75rem 1.25rem;
+    margin: -0.5rem 0 1.75rem;
+  }
+}
+
+/* Stats row — four metric tiles directly below the hero CTA buttons.
+ * Pure CSS grid so it stacks gracefully on narrow viewports without
+ * any media-query gymnastics. Raw <div> children (not a markdown list)
+ * keeps the grid layout robust against mkdocs-material's list styling. */
+.soyuz-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin: 2rem 0 2.5rem;
+}
+
+@media (max-width: 720px) {
+  .soyuz-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.soyuz-stat {
+  background: var(--md-default-fg-color--lightest);
+  border: 1px solid var(--md-default-fg-color--lighter);
+  border-radius: 0.5rem;
+  padding: 1.25rem 1rem;
+  text-align: center;
+}
+
+.soyuz-stat strong {
+  display: block;
+  font-size: clamp(1.8rem, 3.2vw, 2.4rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--md-primary-fg-color);
+  line-height: 1.1;
+  margin-bottom: 0.35rem;
+}
