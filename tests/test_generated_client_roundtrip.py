@@ -88,6 +88,9 @@ from soyuz_catalog_client.api.metastore import (  # noqa: E402
 from soyuz_catalog_client.api.model_versions import (  # noqa: E402
     create_model_version_api_2_1_unity_catalog_models_versions_post as _create_model_version,
 )
+from soyuz_catalog_client.api.model_versions import (  # noqa: E402
+    finalize_model_version_api_2_1_unity_catalog_models_full_name_versions_version_finalize_patch as _finalize_model_version,  # noqa: E501
+)
 from soyuz_catalog_client.api.permissions import (  # noqa: E402
     get_permissions_api_2_1_unity_catalog_permissions_securable_type_full_name_get as _get_permissions,
 )
@@ -347,7 +350,15 @@ def test_generated_client_registered_model_crud(live_server: str) -> None:
     )
     assert isinstance(version, ModelVersionInfo)
     assert version.version == 1
-    assert version.status == "READY"  # type: ignore[comparison-overlap]
+    assert version.status == "PENDING_REGISTRATION"  # type: ignore[comparison-overlap]
+
+    finalized = _finalize_model_version.sync(
+        client=client,
+        full_name=f"{catalog}.{schema}.{model}",
+        version=1,
+    )
+    assert isinstance(finalized, ModelVersionInfo)
+    assert finalized.status == "READY"  # type: ignore[comparison-overlap]
 
     # Force cascade so the child version does not block deletion.
     _delete_registered_model.sync(

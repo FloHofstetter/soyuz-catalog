@@ -22,8 +22,8 @@ jobs:
           enable-cache: true
       - name: Set up Python
         run: uv python install 3.14
-      - name: Install dependencies
-        run: uv sync --group dev
+      - name: Install dependencies (all extras so pyright resolves spark/delta/postgres imports)
+        run: uv sync --group dev --extra spark --extra delta --extra postgres
       - name: Ruff
         run: uv run ruff check .
       - name: Pyright

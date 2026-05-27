@@ -637,34 +637,34 @@ Regression test:
 
 ## Model versions
 
-### `ModelVersion.status` is always `READY` on soyuz-created rows
+### `ModelVersion.status` follows the spec's two-state create-then-finalize flow
 
 The UC `ModelVersionStatus` enum defines four states:
 `MODEL_VERSION_STATUS_UNKNOWN`, `PENDING_REGISTRATION`,
-`FAILED_REGISTRATION`, `READY`. Three of them only make sense
-when the server runs an asynchronous registration pipeline that
-watches artifact uploads (the MLflow Model Registry flow). soyuz
-does not: every `POST /models/versions` commits immediately and
-the row's status is set to `READY` at create time. The other three
-states cannot arise from soyuz's own writes.
+`FAILED_REGISTRATION`, `READY`. soyuz implements the
+spec-conformant two-state flow: every `POST /models/versions`
+returns the new row with status `PENDING_REGISTRATION`, and the
+MLflow UC-OSS client then uploads the artifact bytes to
+`storage_location` and calls
+`PATCH /models/{full_name}/versions/{version}/finalize` to flip
+the row to `READY`. The `UNKNOWN` and `FAILED_REGISTRATION`
+states are reserved for a future async-registration pipeline and
+cannot arise from soyuz's own writes today.
 
 The column stays as a free-form `String(32)` rather than a SQL
 `CHECK` constraint so that a future migration-in of real UC data
-can carry non-`READY` rows without rejecting them at the DB layer.
-`UpdateModelVersion` is typed as `{"comment": str | None}` only,
-with `extra="forbid"`, so a client cannot overwrite the status
-through the update endpoint.
-
-The UC spec also defines a `PATCH /models/{full_name}/versions/
-{version}/finalize` endpoint whose only documented effect is to
-flip `PENDING_REGISTRATION` → `READY`. soyuz does not register
-this route because there is no non-`READY` state to finalise. A
-client that hits the path gets a 404 from FastAPI; the follow-up
-sprint that adds the real async pipeline will wire up the handler.
+can carry the full enum without rejecting unfamiliar values at
+the DB layer. `UpdateModelVersion` is typed as
+`{"comment": str | None}` only, with `extra="forbid"`, so a
+client cannot overwrite the status through the update endpoint —
+the only path from `PENDING_REGISTRATION` to `READY` is
+`/finalize`.
 
 Regression tests:
 `tests/test_model_versions.py::test_create_version_happy_path`
-(asserts `status == "READY"` on create),
+(asserts `status == "PENDING_REGISTRATION"` on create),
+`tests/test_model_versions.py` finalize tests
+(assert the flip to `READY`),
 `tests/test_model_versions.py::test_patch_version_status_rejected_422`.
 
 ### Monotonic version numbering by `MAX(version) + 1`, 409 on race
