@@ -576,8 +576,14 @@ def _traverse_postgres(
     # parameters — only values can. The ``# nosec`` has to live on
     # the f-string line itself (not on the ``text()`` call above) —
     # bandit matches the suppression by the reported line number.
+    # CAST(:root AS VARCHAR) keeps Postgres happy: without the cast, the
+    # non-recursive term types the ``sid`` column as ``text`` (psycopg
+    # infers a plain Python str that way), while the recursive term
+    # supplies ``character varying`` from the lineage_edges columns, and
+    # Postgres rejects the union with DatatypeMismatch. SQLite is
+    # type-affinity-only so the cast is a no-op there.
     node_sql_str = (
-        f"WITH RECURSIVE walk(sid, d) AS (SELECT :root, 0 UNION ALL "  # nosec B608
+        f"WITH RECURSIVE walk(sid, d) AS (SELECT CAST(:root AS VARCHAR), 0 UNION ALL "  # nosec B608
         f"SELECT e.{next_col}, walk.d + 1 FROM lineage_edges e "
         f"JOIN walk ON e.{match_col} = walk.sid WHERE walk.d < :depth) "
         f"SELECT sid, MIN(d) AS depth FROM walk GROUP BY sid"

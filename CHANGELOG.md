@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Postgres `unit (postgres)` CI lane failed on `tests/test_lineage.py`
+  with `DatatypeMismatch: recursive query "walk" column 1 has type
+  text in non-recursive term but type character varying overall`.
+  The non-recursive seed of the lineage-traversal CTE bound `:root`
+  as `text` (psycopg's default for Python `str`), while the recursive
+  term supplied `character varying` from `lineage_edges`. Added an
+  explicit `CAST(:root AS VARCHAR)` so the two terms agree.
+  SQLite uses type-affinity so the cast is a no-op there.
+
 ### Added
 
 - Documentation quality pass for the OSS release. Four new concept
