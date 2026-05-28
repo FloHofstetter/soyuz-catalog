@@ -24,39 +24,6 @@ FastAPI + SQLAlchemy. No JVM. No half-finished endpoints.
 
 ---
 
-<div align="center">
-<sub><b>UC core spec — 14 / 14</b></sub><br/>
-
-![catalogs](https://img.shields.io/badge/catalogs-✓-2ea44f?style=flat-square)
-![schemas](https://img.shields.io/badge/schemas-✓-2ea44f?style=flat-square)
-![tables](https://img.shields.io/badge/tables-✓-2ea44f?style=flat-square)
-![columns](https://img.shields.io/badge/columns-✓-2ea44f?style=flat-square)
-![volumes](https://img.shields.io/badge/volumes-✓-2ea44f?style=flat-square)
-![functions](https://img.shields.io/badge/functions-✓-2ea44f?style=flat-square)
-![registered_models](https://img.shields.io/badge/registered__models-✓-2ea44f?style=flat-square)
-![permissions](https://img.shields.io/badge/permissions-✓-2ea44f?style=flat-square)
-![storage_credentials](https://img.shields.io/badge/storage__credentials-✓-2ea44f?style=flat-square)
-![external_locations](https://img.shields.io/badge/external__locations-✓-2ea44f?style=flat-square)
-![temporary_credentials](https://img.shields.io/badge/temporary__credentials-stub-fbbf24?style=flat-square)
-![metastore_summary](https://img.shields.io/badge/metastore__summary-✓-2ea44f?style=flat-square)
-![staging_tables](https://img.shields.io/badge/staging__tables-✓-2ea44f?style=flat-square)
-![delta_commits](https://img.shields.io/badge/delta__commits-✓-2ea44f?style=flat-square)
-
-<sub><b>Extensions over spec — 8</b></sub><br/>
-
-![tags](https://img.shields.io/badge/tags-+-2563eb?style=flat-square)
-![openlineage](https://img.shields.io/badge/openlineage-+-2563eb?style=flat-square)
-![constraints](https://img.shields.io/badge/constraints-+-2563eb?style=flat-square)
-![connections](https://img.shields.io/badge/connections-+-2563eb?style=flat-square)
-![effective_permissions](https://img.shields.io/badge/effective__permissions-+-2563eb?style=flat-square)
-![delta_rest](https://img.shields.io/badge/delta__REST-+-2563eb?style=flat-square)
-![audit_log](https://img.shields.io/badge/audit__log-+-2563eb?style=flat-square)
-![volume_files](https://img.shields.io/badge/volume__files-+-2563eb?style=flat-square)
-
-</div>
-
----
-
 ## Quick start
 
 ```bash

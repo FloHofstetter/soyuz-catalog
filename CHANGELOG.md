@@ -85,10 +85,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hero (`docs/assets/hero.webp`) stays on the mkdocs frontpage but is no
   longer referenced from the README. The marketing stats row (`14 / 8 /
   0 / MIT`) and the 3-cell emoji value grid are gone, replaced by a
-  centered `> Spec-first. JVM-free. Drop-in.` pull-quote and a 22-chip
-  spec-coverage strip (14 UC-core ✓ plus 8 extensions +; `temporary_credentials`
-  shows `stub` in amber to match the spec-coverage map). The `Why this
-  exists` prose-bullets became a 3-row side-by-side divergence table
+  single centered `> Spec-first. JVM-free. Drop-in.` pull-quote — an
+  earlier draft also shipped a 22-chip spec-coverage strip (14 core +
+  8 extensions) under the pull-quote, but the chips read as a hobbyist
+  shields.io collection and were redundant with the `Spec-conformance`
+  section's "14/14 implemented" bullet linking the canonical
+  `docs/reference/spec-coverage.md`, so they were dropped. The `Why
+  this exists` prose-bullets became a 3-row side-by-side divergence
+  table
   (`<table>` + `<pre>` cells): UC OSS Java behaviour vs soyuz behaviour
   for `PATCH /catalogs {"properties":{}}`, `PATCH /catalogs {garbage:1}`,
   and `POST /tables` with garbage in a column — each row sourced from
