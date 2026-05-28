@@ -68,6 +68,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- README second heroic pass — replaced the stock satellite hero with an
+  animated terminal SVG (`docs/assets/demo.svg`, ~8 KB, ~5 s loop) generated
+  via `asciinema` + `svg-term-cli`. The recording shows soyuz booting on
+  SQLite + alembic-head, `POST /catalogs {"name":"sales"}`, and
+  `GET /catalogs/sales`, returning spec-shaped JSON. Recording is
+  reproducible via the committed `scripts/record_demo.sh`. The satellite
+  hero (`docs/assets/hero.webp`) stays on the mkdocs frontpage but is no
+  longer referenced from the README. The marketing stats row (`14 / 8 /
+  0 / MIT`) and the 3-cell emoji value grid are gone, replaced by a
+  centered `> Spec-first. JVM-free. Drop-in.` pull-quote and a 22-chip
+  spec-coverage strip (14 UC-core ✓ plus 8 extensions +; `temporary_credentials`
+  shows `stub` in amber to match the spec-coverage map). The `Why this
+  exists` prose-bullets became a 3-row side-by-side divergence table
+  (`<table>` + `<pre>` cells): UC OSS Java behaviour vs soyuz behaviour
+  for `PATCH /catalogs {"properties":{}}`, `PATCH /catalogs {garbage:1}`,
+  and `POST /tables` with garbage in a column — each row sourced from
+  `DIVERGENCES.md`. A new `Spec-conformance` section gives three linked
+  proofs (14/14 coverage, the spec-drift CI gate, regression tests per
+  divergence). `Works with these clients` switched from a 5-cell emoji
+  table to a 6-badge row using `shields.io` `for-the-badge` shields with
+  embedded `simple-icons` brand logos (Apache Spark, delta-rs, MLflow,
+  FastAPI, Pydantic, SQLAlchemy) — no logo files committed, no licence
+  attribution required. `Quick start` moved above `Why this exists`
+  (action before context) and the launch command corrected to
+  `uv run uvicorn soyuz_catalog.api.main:app --reload` on port 8000 to
+  match `docs/getting-started/quickstart.md`. Design principles,
+  documentation index, project artifacts, and contributing / security /
+  license footer unchanged.
 - Pre-OSS hygiene pass: removed internal sprint / phase / bug-tracker
   identifiers from docstrings and inline comments in
   `soyuz_catalog/storage/volume_files.py`,
