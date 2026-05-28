@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/demo.svg" alt="soyuz-catalog: boot, create catalog, read catalog — terminal demo" width="80%">
+<img src="docs/assets/demo.svg" alt="soyuz-catalog terminal: boot on sqlite + alembic-head, POST /catalogs returns spec-shaped JSON" width="80%">
 
 # soyuz-catalog
 

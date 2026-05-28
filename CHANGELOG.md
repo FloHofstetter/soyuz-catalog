@@ -68,12 +68,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- README second heroic pass — replaced the stock satellite hero with an
-  animated terminal SVG (`docs/assets/demo.svg`, ~8 KB, ~5 s loop) generated
-  via `asciinema` + `svg-term-cli`. The recording shows soyuz booting on
-  SQLite + alembic-head, `POST /catalogs {"name":"sales"}`, and
-  `GET /catalogs/sales`, returning spec-shaped JSON. Recording is
-  reproducible via the committed `scripts/record_demo.sh`. The satellite
+- README second heroic pass — replaced the stock satellite hero with a
+  banner-shaped terminal SVG (`docs/assets/demo.svg`, ~4 KB, 1000×277)
+  generated via `asciinema` + `svg-term-cli --at` (single static
+  frame at the recording's end timestamp, not an animation). The
+  banner shows soyuz booting on SQLite + alembic-head and
+  `POST /catalogs {"name":"sales"}` returning a spec-shaped JSON
+  body. Static was chosen over animated after the first push showed
+  the animated SVG had a dead lower half on GitHub: at most loop
+  positions the bottom rows were empty terminal background, which
+  read as a giant black void below the demo. The static end-frame
+  has every line visible immediately, no animation policy quirks
+  across GitHub dark mode / Camo proxy / browser SVG handling.
+  Recording is reproducible via the committed `scripts/record_demo.sh`.
+  The satellite
   hero (`docs/assets/hero.webp`) stays on the mkdocs frontpage but is no
   longer referenced from the README. The marketing stats row (`14 / 8 /
   0 / MIT`) and the 3-cell emoji value grid are gone, replaced by a
