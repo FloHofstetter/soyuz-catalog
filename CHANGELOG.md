@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- GitHub Pages was serving the raw markdown in `docs/` via the legacy
+  Jekyll build instead of the mkdocs-material site, so none of the
+  hero, grid-cards, content-tabs, or mermaid diagrams rendered on
+  `flohofstetter.github.io/soyuz-catalog`. Added `.github/workflows/docs.yml`
+  that builds `mkdocs build --strict` and deploys via the official
+  `actions/upload-pages-artifact` + `actions/deploy-pages` pair, and
+  flipped the Pages source from `branch=main, path=/docs` (legacy) to
+  `build_type=workflow` (GitHub Actions).
 - Postgres `unit (postgres)` CI lane failed on `tests/test_lineage.py`
   with `DatatypeMismatch: recursive query "walk" column 1 has type
   text in non-recursive term but type character varying overall`.
