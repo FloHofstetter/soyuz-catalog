@@ -136,11 +136,14 @@ repos:
 
       - id: pip-audit
         name: pip-audit
-        # TODO(2026-Q3): drop --ignore-vuln once a pip > 26.0.1 ships
-        # the CVE-2026-3219 fix (no fix release at 2026-04-26). pip is
-        # the bundled installer, not a runtime dep — re-audit the
-        # moment an upstream release lands.
-        entry: uv run pip-audit --ignore-vuln CVE-2026-3219
+        # pip is the bundled installer in the uv-managed venv, not a
+        # runtime dependency, and `uv run` re-pins it on every invocation
+        # so a manual upgrade cannot clear these. Both advisories are
+        # against pip itself; re-audit and drop each ignore the moment
+        # the venv's pinned pip carries the fix.
+        #   - CVE-2026-3219  (no fix release as of 2026-04-26)
+        #   - PYSEC-2026-196 (fixed in pip 26.1.2; venv still pins 26.1.1)
+        entry: uv run pip-audit --ignore-vuln CVE-2026-3219 --ignore-vuln PYSEC-2026-196
         language: system
         pass_filenames: false
         stages: [pre-push]
