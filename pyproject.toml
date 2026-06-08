@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "soyuz-catalog"
-version = "0.2.0rc4"
+version = "0.2.0"
 description = "A clean Python reference implementation of the Unity Catalog REST API spec."
 license = "Apache-2.0"
 readme = "README.md"
