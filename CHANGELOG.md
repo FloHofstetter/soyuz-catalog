@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `POST /tables` with columns that omit `position` inserted `NULL`
+  into the non-nullable `table_columns.position` column, and duplicate
+  explicit positions collided on `UNIQUE(table_id, position)` — both
+  error shapes were swallowed by the generic duplicate-name handler
+  and misreported as `409 "Table already exists"`. Column positions
+  are now resolved before the flush: omitted everywhere →
+  auto-numbered from list order (0-based, matching the UC spec's
+  "ordinal position" wording); duplicate explicit positions or a mix
+  of explicit and omitted → `400 INVALID_ARGUMENT`. The 409 from
+  table create is back to meaning exactly one thing: a duplicate
+  table name.
 - Audit-log rows were silently lost: `audit_service.log_action` only
   `flush()`-ed the new row, every mutation route calls the helper
   *after* its service function has already committed, and nothing

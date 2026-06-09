@@ -121,6 +121,50 @@ def test_create_table_duplicate_409(client: TestClient) -> None:
     assert r.json()["error_code"] == "ALREADY_EXISTS"
 
 
+def test_create_table_without_positions_autonumbers(client: TestClient) -> None:
+    """Regression: omitted column positions are auto-numbered from list order.
+
+    Previously every omitted ``position`` was inserted as ``NULL``, which
+    tripped the column constraints and was mistranslated into a bogus
+    409 "Table already exists".
+    """
+    _make_catalog(client)
+    _make_schema(client)
+    cols = []
+    for name in ("a", "b", "c"):
+        col = _minimal_column(name)
+        del col["position"]
+        cols.append(col)
+    r = client.post(TABLES, json=_minimal_create_body(columns=cols))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert [c["name"] for c in body["columns"]] == ["a", "b", "c"]
+    assert [c["position"] for c in body["columns"]] == [0, 1, 2]
+
+
+def test_create_table_duplicate_positions_400(client: TestClient) -> None:
+    """Regression: duplicate explicit positions are a 400, not a fake 409."""
+    _make_catalog(client)
+    _make_schema(client)
+    cols = [_minimal_column("a", 0), _minimal_column("b", 0)]
+    r = client.post(TABLES, json=_minimal_create_body(columns=cols))
+    assert r.status_code == 400
+    assert r.json()["error_code"] == "INVALID_ARGUMENT"
+    assert "position" in r.json()["message"]
+
+
+def test_create_table_mixed_positions_400(client: TestClient) -> None:
+    """Mixing explicit and omitted positions is ambiguous and rejected."""
+    _make_catalog(client)
+    _make_schema(client)
+    col_without = _minimal_column("b")
+    del col_without["position"]
+    cols = [_minimal_column("a", 0), col_without]
+    r = client.post(TABLES, json=_minimal_create_body(columns=cols))
+    assert r.status_code == 400
+    assert r.json()["error_code"] == "INVALID_ARGUMENT"
+
+
 def test_create_table_same_name_in_other_schema_allowed(client: TestClient) -> None:
     _make_catalog(client)
     _make_schema(client, name="s1")

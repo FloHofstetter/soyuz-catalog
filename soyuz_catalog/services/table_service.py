@@ -75,17 +75,56 @@ def _get_schema_or_404(session: Session, catalog_name: str, schema_name: str) ->
     return schema
 
 
-def _column_from_payload(payload: ColumnInfo) -> Column:
+def _resolve_column_positions(columns: list[ColumnInfo]) -> list[int]:
+    """Resolve the ``position`` for every column of a create request.
+
+    The UC spec marks ``ColumnInfo.position`` as optional, so a client may
+    omit it entirely and rely on list order. Before this helper existed,
+    omitted positions were inserted as ``NULL`` and explicit duplicates
+    collided on ``UNIQUE(table_id, position)`` — both surfaced through the
+    generic ``IntegrityError`` handler as a bogus 409 "already exists".
+    Resolving and validating positions *before* the flush keeps that
+    handler's 409 meaning exactly one thing: a duplicate table name.
+
+    Mixed payloads (some columns with ``position``, some without) are
+    rejected rather than back-filled because any gap-filling rule would
+    silently reorder columns the client believed it had pinned.
+
+    Args:
+        columns: Validated column payloads, in request list order.
+
+    Returns:
+        list[int]: One position per column, parallel to ``columns``.
+
+    Raises:
+        InvalidRequestError: If positions mix explicit and omitted values,
+            or if two columns carry the same explicit position.
+    """
+    explicit = [c.position for c in columns if c.position is not None]
+    if not explicit:
+        return list(range(len(columns)))
+    if len(explicit) != len(columns):
+        raise InvalidRequestError(
+            "Either every column must specify 'position' or none may; "
+            "got a mix of explicit and omitted positions",
+        )
+    if len(set(explicit)) != len(explicit):
+        raise InvalidRequestError("Column 'position' values must be unique within a table")
+    return explicit
+
+
+def _column_from_payload(payload: ColumnInfo, position: int) -> Column:
     """Build a :class:`Column` ORM row from a :class:`ColumnInfo` payload.
 
-    ``position`` is taken verbatim from the payload rather than being
-    auto-numbered, so a client that GETs and POSTs a column list gets
-    back the same ordering it sent. ``nullable`` defaults to ``True`` when
-    the client omits it, matching the UC spec default for
-    ``ColumnInfo.nullable``.
+    ``position`` is passed in pre-resolved by
+    :func:`_resolve_column_positions` — verbatim from the payload when the
+    client pinned it, auto-numbered from list order when the whole request
+    omitted it. ``nullable`` defaults to ``True`` when the client omits it,
+    matching the UC spec default for ``ColumnInfo.nullable``.
 
     Args:
         payload: Validated column info from the create request.
+        position: Resolved ordinal position for this column.
 
     Returns:
         Column: The detached ORM row, ready to be appended to
@@ -99,7 +138,7 @@ def _column_from_payload(payload: ColumnInfo) -> Column:
         type_precision=payload.type_precision,
         type_scale=payload.type_scale,
         type_interval_type=payload.type_interval_type,
-        position=payload.position,
+        position=position,
         comment=payload.comment,
         nullable=payload.nullable if payload.nullable is not None else True,
         partition_index=payload.partition_index,
@@ -124,6 +163,12 @@ def create_table(session: Session, payload: CreateTable) -> Table:
     breaking the first query — that laxness is the UC OSS Java
     behaviour we intentionally reject (see ``DIVERGENCES.md``).
 
+    Column positions are resolved by :func:`_resolve_column_positions`
+    before the flush: omitted everywhere means auto-numbered from list
+    order, and invalid combinations fail with 400 instead of tripping
+    the ``UNIQUE(table_id, position)`` constraint and masquerading as a
+    duplicate-table 409.
+
     Args:
         session: Active SQLAlchemy session.
         payload: Validated create request.
@@ -137,10 +182,13 @@ def create_table(session: Session, payload: CreateTable) -> Table:
             :func:`_get_schema_or_404` when the parent catalog or schema
             does not exist, and ``InvalidRequestError`` from
             :func:`soyuz_catalog.storage.parse_storage_uri` when the
-            ``storage_location`` scheme is unsupported.)
+            ``storage_location`` scheme is unsupported or from
+            :func:`_resolve_column_positions` when column positions are
+            mixed or duplicated.)
     """
     schema = _get_schema_or_404(session, payload.catalog_name, payload.schema_name)
     parse_storage_uri(payload.storage_location)
+    positions = _resolve_column_positions(payload.columns)
     table = Table(
         name=payload.name,
         schema_id=schema.id,
@@ -151,8 +199,8 @@ def create_table(session: Session, payload: CreateTable) -> Table:
         comment=payload.comment,
         properties=payload.properties or {},
     )
-    for col_payload in payload.columns:
-        table.columns.append(_column_from_payload(col_payload))
+    for col_payload, position in zip(payload.columns, positions, strict=True):
+        table.columns.append(_column_from_payload(col_payload, position))
     session.add(table)
     with commit_or_conflict(
         session,

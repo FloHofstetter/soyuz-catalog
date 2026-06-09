@@ -289,8 +289,15 @@ Create a new table under an existing schema.
 | `properties`         | map<string,string> | no       | Arbitrary key-value metadata                         |
 
 Each element of `columns` is a `ColumnInfo` with `name`, `type_text`,
-`type_json`, `type_name`, `position`, and optional
+`type_json`, `type_name`, and optional `position`/
 `type_precision`/`type_scale`/`type_interval_type`/`comment`/`nullable`/`partition_index`.
+
+`position` may be omitted on **every** column, in which case columns are
+auto-numbered from list order (0-based). Mixing explicit and omitted
+positions, or repeating an explicit position, is rejected with
+`400 INVALID_ARGUMENT` — previously these payloads tripped the
+`UNIQUE(table_id, position)` constraint and were misreported as
+`409 "Table already exists"`.
 
 **Response**: `200 OK` with a `TableInfo`. `full_name` is computed from the
 live parent catalog and schema names at response time, so a rename of
@@ -317,7 +324,8 @@ constraints.
 - `422` — malformed body, unknown top-level field, **or unknown field inside
   any `columns[i]`**.
 - `400 INVALID_ARGUMENT` — `storage_location` uses an unsupported URI
-  scheme. See [Storage URIs](#storage-uris).
+  scheme (see [Storage URIs](#storage-uris)), duplicate explicit column
+  `position` values, or a mix of explicit and omitted positions.
 
 !!! note "UC OSS bug fix"
     `CreateTable` and `ColumnInfo` both use `extra="forbid"`, so a typo like
