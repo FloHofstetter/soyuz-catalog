@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The `Settings.model_artifact_root` docstring still described the
+  default as "cwd-relative" after the default paths were anchored to
+  the repository root. Docstring only — no behaviour change.
+
 ### Added
 
 - Mutation-testing harness (mutmut 3.x): `[mutmut]` config in

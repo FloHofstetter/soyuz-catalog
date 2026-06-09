@@ -48,7 +48,8 @@ class Settings(BaseSettings):
             UC-OSS client uploads artifacts to that URL before calling
             ``finalizeModelVersion`` to flip status from
             ``PENDING_REGISTRATION`` to ``READY``. The default is a
-            cwd-relative ``model_artifacts`` folder; deployments using
+            ``model_artifacts`` folder anchored to the repository root
+            (stable regardless of launch CWD); deployments using
             persistent storage should override via
             ``SOYUZ_MODEL_ARTIFACT_ROOT``.
     """
