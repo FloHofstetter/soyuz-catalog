@@ -457,6 +457,27 @@ def delete_constraints_for_table(session: Session, table_id: str) -> None:
         session: Active SQLAlchemy session. The caller commits.
         table_id: Opaque id of the table being deleted.
     """
+    delete_constraints_for_tables(session, [table_id])
+
+
+def delete_constraints_for_tables(session: Session, table_ids: list[str]) -> None:
+    """Bulk cascade hook: wipe the constraints of many tables at once.
+
+    Used by the ``force=true`` cascade paths of ``delete_schema`` and
+    ``delete_catalog``, which drop whole subtrees of tables via the
+    ORM relationship cascade and would otherwise leave the declared
+    constraints behind as orphans — ``delete_table`` cleans up after
+    itself, and the subtree cascades must match it row for row. One
+    ``DELETE ... WHERE table_id IN (...)`` keeps the fan-out at a
+    single statement regardless of subtree size.
+
+    Args:
+        session: Active SQLAlchemy session. The caller commits.
+        table_ids: Opaque ids of the tables being deleted. An empty
+            list is a no-op.
+    """
+    if not table_ids:
+        return
     session.execute(
-        delete(TableConstraint).where(TableConstraint.table_id == table_id),
+        delete(TableConstraint).where(TableConstraint.table_id.in_(table_ids)),
     )

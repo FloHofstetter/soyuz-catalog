@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `DELETE /schemas/{name}?force=true` and
+  `DELETE /catalogs/{name}?force=true` drop child tables via the ORM
+  cascade but skipped the FK-free `table_constraints` side table that
+  `delete_table` cleans up explicitly — leaving unreachable orphan
+  rows behind. Both cascade paths now call the new
+  `constraints_service.delete_constraints_for_tables` bulk hook
+  (single `DELETE ... WHERE table_id IN (...)`).
 - `POST /delta/preview/commits` carrying both `commit_info` and
   `latest_backfilled_version` documents that the registered commit's
   persistence does not depend on the prune half of the request — but

@@ -306,6 +306,7 @@ def delete_catalog(session: Session, name: str, force: bool = False) -> None:
         session.scalars(select(Schema.id).where(Schema.catalog_id == catalog.id)),
     )
     pairs.extend(("schema", sid) for sid in schema_ids)
+    table_ids: list[str] = []
     for model_cls, label in (
         (Table, "table"),
         (Volume, "volume"),
@@ -317,7 +318,15 @@ def delete_catalog(session: Session, name: str, force: bool = False) -> None:
                 select(model_cls.id).where(model_cls.catalog_id == catalog.id),
             ),
         )
+        if label == "table":
+            table_ids = ids
         pairs.extend((label, rid) for rid in ids)
     wipe_permissions_for(session, pairs)
+    # Declared-constraints cascade (ADR-0012): see
+    # ``delete_schema`` — the subtree cascade must clean up constraint
+    # rows the same way ``delete_table`` does.
+    from soyuz_catalog.services.constraints_service import delete_constraints_for_tables
+
+    delete_constraints_for_tables(session, table_ids)
     session.delete(catalog)
     session.commit()

@@ -320,6 +320,7 @@ def delete_schema(session: Session, full_name: str, force: bool = False) -> None
     # :func:`soyuz_catalog.services.catalog_service.delete_catalog`
     # for the rationale.
     pairs: list[tuple[str, str]] = [("schema", schema.id)]
+    table_ids: list[str] = []
     for model_cls, label in (
         (Table, "table"),
         (Volume, "volume"),
@@ -329,8 +330,17 @@ def delete_schema(session: Session, full_name: str, force: bool = False) -> None
         ids = list(
             session.scalars(select(model_cls.id).where(model_cls.schema_id == schema.id)),
         )
+        if label == "table":
+            table_ids = ids
         pairs.extend((label, rid) for rid in ids)
     wipe_permissions_for(session, pairs)
+    # Declared-constraints cascade (ADR-0012): the ORM
+    # cascade below drops the table rows, but their constraint rows
+    # live FK-free on a side table and must be wiped explicitly —
+    # exactly what ``delete_table`` does on the single-table path.
+    from soyuz_catalog.services.constraints_service import delete_constraints_for_tables
+
+    delete_constraints_for_tables(session, table_ids)
     if function_count:
         session.execute(delete(Function).where(Function.schema_id == schema.id))
     if model_count:

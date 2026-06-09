@@ -531,3 +531,57 @@ def test_batch_rolls_back_on_failure(client: TestClient) -> None:
     assert r.status_code == 400, r.text
     body = _get_table(client)
     assert body.get("table_constraints") is None
+
+
+def test_schema_force_delete_wipes_constraint_rows(
+    client: TestClient,
+    session_factory: Any,
+) -> None:
+    """Regression: ``DELETE /schemas?force=true`` must not orphan constraints.
+
+    ``delete_table`` wipes the table's declared constraints; the
+    schema- and catalog-level force cascades drop the same tables via
+    the ORM relationship and previously left the FK-free constraint
+    rows behind as unreachable orphans.
+    """
+    from sqlalchemy import select
+
+    from soyuz_catalog.models import TableConstraint
+
+    _make_parents(client)
+    _create_delta_table(client)
+    r = _add(
+        client,
+        "orders",
+        {"name": "pk", "primary_key_constraint": {"child_columns": ["id"]}},
+    )
+    assert r.status_code == 200, r.text
+
+    assert client.delete(f"{SCHEMAS}/cat1.sch1", params={"force": True}).status_code == 200
+
+    with session_factory() as session:
+        assert session.scalars(select(TableConstraint)).all() == []
+
+
+def test_catalog_force_delete_wipes_constraint_rows(
+    client: TestClient,
+    session_factory: Any,
+) -> None:
+    """Same regression as above, one level up: catalog force-delete."""
+    from sqlalchemy import select
+
+    from soyuz_catalog.models import TableConstraint
+
+    _make_parents(client)
+    _create_delta_table(client)
+    r = _add(
+        client,
+        "orders",
+        {"name": "pk", "primary_key_constraint": {"child_columns": ["id"]}},
+    )
+    assert r.status_code == 200, r.text
+
+    assert client.delete(f"{CATALOGS}/cat1", params={"force": True}).status_code == 200
+
+    with session_factory() as session:
+        assert session.scalars(select(TableConstraint)).all() == []
