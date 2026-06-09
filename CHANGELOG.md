@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `POST /delta/preview/commits` carrying both `commit_info` and
+  `latest_backfilled_version` documents that the registered commit's
+  persistence does not depend on the prune half of the request — but
+  the write path only flushed, so a prune rejection (e.g.
+  `latest_backfilled_version` past the new latest) rolled the
+  freshly-registered row back with the request session. The write
+  path now commits before the prune path runs, matching the
+  documented contract.
 - The `Settings.model_artifact_root` docstring still described the
   default as "cwd-relative" after the default paths were anchored to
   the repository root. Docstring only — no behaviour change.

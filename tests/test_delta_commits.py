@@ -505,3 +505,43 @@ def test_post_accepts_opaque_metadata_and_uniform(
         },
     )
     assert r.status_code == 200, r.text
+
+
+def test_post_fused_request_keeps_commit_when_prune_is_rejected(
+    client: TestClient,
+    tmp_path: Path,
+) -> None:
+    """Regression: the write half of a fused POST must survive a prune 400.
+
+    The documented contract is that the registered commit's persistence
+    does not depend on the prune half of the same request. Previously
+    the write path only flushed, so a ``latest_backfilled_version``
+    past the new latest rolled the freshly-inserted row back together
+    with the rest of the request session.
+    """
+    _bootstrap_schema(client)
+    table_path = _write_delta(tmp_path, "t_fused")
+    uri = f"file://{table_path}"
+    table_id = _create_table(client, "t_fused", uri)
+
+    r = client.post(
+        COMMITS,
+        json={
+            "table_id": table_id,
+            "table_uri": uri,
+            "commit_info": _commit_info(1),
+            "latest_backfilled_version": 2,
+        },
+    )
+    assert r.status_code == 400, r.text
+    assert "latest_backfilled_version" in r.json()["message"]
+
+    r = client.request(
+        "GET",
+        COMMITS,
+        json={"table_id": table_id, "table_uri": uri, "start_version": 0},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert [c["version"] for c in body["commits"]] == [1]
+    assert body["latest_table_version"] == 1

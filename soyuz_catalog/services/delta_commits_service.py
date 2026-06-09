@@ -339,11 +339,14 @@ def commit(session: Session, payload: DeltaCommit) -> None:
     together on a single ``POST``: registering a freshly-staged commit
     (``commit_info`` set) and acknowledging that the client has
     published everything up to a given version (``latest_backfilled_version``
-    set). The write path runs first so the new row's persistence does
-    not depend on the prune — a client that sends both fields in one
-    call expects version ``N`` to appear in ``get_commits`` output if
-    the prune then fails for any reason (it cannot in practice, but
-    the ordering is documented contract).
+    set). The write path runs first **and commits immediately** so the
+    new row's persistence does not depend on the prune — a client that
+    sends both fields in one call expects version ``N`` to appear in
+    ``get_commits`` output even if the prune half is then rejected
+    (e.g. ``latest_backfilled_version`` past the new latest).
+    Previously the write path only flushed, so a prune rejection rolled
+    the freshly-registered row back with the rest of the request
+    session.
 
     Write path (``commit_info`` set):
 
@@ -443,7 +446,14 @@ def commit(session: Session, payload: DeltaCommit) -> None:
         )
         session.add(row)
         try:
-            session.flush()
+            # Commit (not just flush) so the registered row's
+            # persistence genuinely does not depend on the prune half
+            # of a fused request — the documented contract above. With
+            # a bare flush, a prune rejection (e.g.
+            # ``latest_backfilled_version > info.version``) would
+            # propagate before the final commit and the request-scoped
+            # session rollback would silently drop the row.
+            session.commit()
         except IntegrityError as exc:
             session.rollback()
             raise ConflictError(
