@@ -42,9 +42,13 @@ jobs:
       - name: Build server wheel + sdist
         run: uv build
 
+      # The client is a uv workspace member, so `uv build` always writes
+      # to the workspace root's dist/ — even when invoked from inside
+      # soyuz-catalog-client/. Select the member via --package and glob a
+      # single dist/ below; the old `working-directory:` form left
+      # soyuz-catalog-client/dist/ empty and failed every release run.
       - name: Build client wheel + sdist
-        working-directory: soyuz-catalog-client
-        run: uv build
+        run: uv build --package soyuz-catalog-client
 
       - name: Generate release notes
         run: |
@@ -70,6 +74,4 @@ jobs:
             --notes-file RELEASE_NOTES.md \
             ${PRERELEASE_FLAG} \
             dist/*.whl \
-            dist/*.tar.gz \
-            soyuz-catalog-client/dist/*.whl \
-            soyuz-catalog-client/dist/*.tar.gz
+            dist/*.tar.gz

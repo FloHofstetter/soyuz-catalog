@@ -47,6 +47,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `Settings.model_artifact_root` docstring still described the
   default as "cwd-relative" after the default paths were anchored to
   the repository root. Docstring only — no behaviour change.
+- The release workflow never published a single release: the client
+  build step ran `uv build` with
+  `working-directory: soyuz-catalog-client`, but the client is a uv
+  workspace member so the artifacts always land in the workspace
+  root's `dist/` — `gh release create` then failed on the empty
+  `soyuz-catalog-client/dist/*.whl` glob (v0.2.0's release run died
+  the same way). The step now selects the member via
+  `uv build --package soyuz-catalog-client` and the release attaches
+  all four artifacts from the single root `dist/`.
 
 ### Added
 
