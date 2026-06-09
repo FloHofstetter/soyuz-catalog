@@ -1421,7 +1421,7 @@ wheels = [
 
 [[package]]
 name = "soyuz-catalog"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
@@ -1519,7 +1519,7 @@ docs = [
 
 [[package]]
 name = "soyuz-catalog-client"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "soyuz-catalog-client" }
 dependencies = [
     { name = "attrs" },
