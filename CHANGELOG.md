@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Mutation-testing harness (mutmut 3.x): `[mutmut]` config in
+  `setup.cfg` scoped to the unit-tested seams (`services/`,
+  `storage/`, `pagination.py`), a `scripts/mutation/run_mutmut.py`
+  wrapper that hardens the generated trampoline and caps workers at
+  `cpu_count // 2`, a committed kill-count baseline with
+  `snapshot_baseline.py` diffing, a known-equivalent survivor
+  allowlist, a PR-incremental gate
+  (`scripts/check-mutation-budget.sh`) that mutates only the changed
+  modules, and an informational nightly full sweep
+  (`.github/workflows/mutation-nightly.yml`).
+
 ## [0.2.0] - 2026-06-08
 
 ### Fixed

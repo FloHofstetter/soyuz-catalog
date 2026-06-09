@@ -1,0 +1,21 @@
+{
+  "modules": {
+    "soyuz_catalog.services.connection_service": {
+      "killed": 4,
+      "survived": 0,
+      "no_test": 0
+    },
+    "soyuz_catalog.services.delta_rest_service": {
+      "killed": 16,
+      "survived": 0,
+      "no_test": 0
+    },
+    "soyuz_catalog.services.lineage_service": {
+      "killed": 40,
+      "survived": 0,
+      "no_test": 0
+    }
+  },
+  "survivors": [],
+  "total_survivors": 0
+}

@@ -51,6 +51,12 @@ coverage.xml
 .pytest_cache/
 cover/
 
+# Mutation testing (mutmut 3.x) — the working copy + stats cache, never
+# committed. See scripts/mutation/README.md.
+mutants/
+mutmut-stats.json
+.mutmut-cache
+
 # Translations
 *.mo
 *.pot
