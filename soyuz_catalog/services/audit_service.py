@@ -39,10 +39,18 @@ def log_action(
 ) -> int | None:
     """Persist one audit-log row for the in-flight request.
 
+    The insert is committed here, in its own transaction: every
+    mutation route calls this helper *after* its service function has
+    already committed the actual mutation, and nothing downstream
+    commits the request session again. A bare ``flush()`` (the
+    previous behaviour) left the row in a transaction that
+    ``get_db``'s ``session.close()`` rolled back at request teardown,
+    silently dropping every audit row.
+
     Args:
-        db: Live SQLAlchemy session (the same one the route uses
-            for the mutation it just performed; commits the audit
-            row in the same transaction).
+        db: Live SQLAlchemy session (the same one the route used for
+            the mutation it just performed; that mutation is already
+            committed by the time this helper runs).
         action: Dotted action name (``table.created`` /
             ``schema.deleted`` / ``tag.updated`` / …).  Convention
             is ``<resource>.<verb>``.
@@ -73,7 +81,7 @@ def log_action(
     )
     try:
         db.add(row)
-        db.flush()
+        db.commit()
         return row.id
     except Exception as exc:  # noqa: BLE001 — audit must not break the mutation
         logger.warning("audit_service: insert failed for %r %r: %s", action, target, exc)

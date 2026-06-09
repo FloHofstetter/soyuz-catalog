@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Audit-log rows were silently lost: `audit_service.log_action` only
+  `flush()`-ed the new row, every mutation route calls the helper
+  *after* its service function has already committed, and nothing
+  downstream commits the request session again — so the session
+  teardown rolled the row back. The audit trail never persisted a
+  single row through the documented flow; `GET /audit-log` was
+  permanently empty. `log_action` now commits the row itself.
 - `DELETE /schemas/{name}?force=true` and
   `DELETE /catalogs/{name}?force=true` drop child tables via the ORM
   cascade but skipped the FK-free `table_constraints` side table that
