@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Delta Sharing serves `timestampNtz` tables.** The reader-feature
+  gate treated every `minReaderVersion > 1` table as unshareable;
+  `timestampNtz` is a benign type annotation (the parquet files read
+  like any other), and modern `deltalake` stamps it on every naive
+  timestamp column — which made freshly written tables with
+  timestamps unshareable in practice. The gate now lets tables
+  through when *all* reader features are benign annotations and
+  keeps rejecting everything that changes the physical read
+  (`deletionVectors`, `columnMapping`, …).
+
 ### Added
 
 - **Delta Sharing server** (over-the-spec extension, ADR-0015): both

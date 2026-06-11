@@ -484,6 +484,42 @@ def test_unsupported_reader_features_rejected(client: TestClient, tmp_path: Path
     assert "deletionVectors" in body["message"]
 
 
+def test_timestamp_ntz_tables_are_served(client: TestClient, tmp_path: Path) -> None:
+    """``timestampNtz`` is a benign type annotation — the parquet files
+    read like any other, so the higher reader version must not block
+    the share (modern deltalake stamps it on every naive timestamp)."""
+    table_path = tmp_path / "ntz_table"
+    write_deltalake(
+        str(table_path),
+        pa.table(
+            {
+                "id": pa.array([1, 2], type=pa.int64()),
+                "placed_at": pa.array([1, 2], type=pa.timestamp("us")),
+            }
+        ),
+    )
+    _register_table(client, f"file://{table_path}", name="ntz_table")
+    assert client.post(SHARES, json={"name": "sh_ntz"}).status_code == 200
+    assert (
+        client.post(
+            f"{SHARES}/sh_ntz/objects", json={"table_full_name": "main.s.ntz_table"}
+        ).status_code
+        == 200
+    )
+    token = client.post(RECIPIENTS, json={"name": "r_ntz"}).json()["token"]
+    assert client.put(f"{SHARES}/sh_ntz/recipients/r_ntz").status_code == 200
+    r = client.post(
+        f"{DS}/shares/sh_ntz/schemas/s/tables/ntz_table/query",
+        json={},
+        headers=_auth(token),
+    )
+    assert r.status_code == 200, r.text
+    lines = [json.loads(line) for line in r.text.splitlines() if line.strip()]
+    assert lines[0]["protocol"]["minReaderVersion"] == 1
+    file_lines = [line for line in lines if "file" in line]
+    assert file_lines, r.text
+
+
 def test_cloud_scheme_501(client: TestClient) -> None:
     _register_table(client, "s3://bucket/prefix/orders")
     assert client.post(SHARES, json={"name": "sh"}).status_code == 200

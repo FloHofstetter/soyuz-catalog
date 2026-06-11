@@ -49,6 +49,16 @@ from soyuz_catalog.services import table_service
 from soyuz_catalog.services.sharing_service import effective_placement, hash_token
 
 PROTOCOL_MIN_READER_VERSION = 1
+
+BENIGN_READER_FEATURES = frozenset({"timestampNtz"})
+"""Reader features that do not change how the parquet files read.
+
+``timestampNtz`` is a pure type annotation — the data files carry
+ordinary parquet timestamps without a timezone, which every
+parquet-reading consumer handles natively.  Anything else
+(``deletionVectors``, ``columnMapping``, ``v2Checkpoint``, …)
+changes the physical read and stays rejected.
+"""
 """The only Delta reader protocol version soyuz serves over parquet format.
 
 Tables whose ``_delta_log`` protocol demands reader version 2+
@@ -480,15 +490,18 @@ def load_snapshot(storage_location: str | None, version: int | None = None) -> T
 
     protocol = dt.protocol()
     if protocol.min_reader_version > PROTOCOL_MIN_READER_VERSION:
-        features = sorted(protocol.reader_features or [])
-        raise SharingProtocolError(
-            400,
-            "UNSUPPORTED_TABLE_FEATURES",
-            "shared table requires Delta reader version "
-            f"{protocol.min_reader_version}"
-            + (f" with reader features {features}" if features else "")
-            + "; this server shares minReaderVersion=1 tables only",
-        )
+        features = set(protocol.reader_features or [])
+        unsupported = sorted(features - BENIGN_READER_FEATURES)
+        if unsupported or not features:
+            raise SharingProtocolError(
+                400,
+                "UNSUPPORTED_TABLE_FEATURES",
+                "shared table requires Delta reader version "
+                f"{protocol.min_reader_version}"
+                + (f" with reader features {unsupported}" if unsupported else "")
+                + "; this server shares minReaderVersion=1 tables "
+                + "(plus the benign timestampNtz annotation) only",
+            )
 
     metadata = dt.metadata()
     files: list[SnapshotFile] = []
@@ -535,9 +548,11 @@ def load_snapshot(storage_location: str | None, version: int | None = None) -> T
 def protocol_line() -> str:
     """Render the protocol action line of an NDJSON response.
 
-    Always ``minReaderVersion=1``: :func:`load_snapshot` rejects
-    tables that demand more, so by the time a response is being
-    assembled this constant is the truth.
+    Always ``minReaderVersion=1``: :func:`load_snapshot` only lets
+    higher-version tables through when every reader feature is a
+    benign annotation (``timestampNtz``), which parquet consumers do
+    not need to know about — so the abstraction this constant
+    advertises stays the truth for the files actually served.
 
     Returns:
         str: One JSON line, no trailing newline.
