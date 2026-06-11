@@ -33,6 +33,7 @@ from soyuz_catalog.models.lineage import (
 )
 from soyuz_catalog.models.metastore import Metastore
 from soyuz_catalog.models.ml import ModelVersion, RegisteredModel
+from soyuz_catalog.models.semantic import MetricView
 from soyuz_catalog.models.staging import DeltaUnbackfilledCommit, StagingTable
 
 __all__ = [
@@ -50,6 +51,7 @@ __all__ = [
     "LineageRun",
     "LineageValueChange",
     "Metastore",
+    "MetricView",
     "ModelVersion",
     "Permission",
     "RegisteredModel",

@@ -1896,3 +1896,142 @@ class TagList(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     tags: list[TagEntry] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Metric views — over-the-spec extension (ADR-0014)
+# ---------------------------------------------------------------------------
+
+
+class MetricViewDimension(BaseModel):
+    """One dimension in a metric-view spec.
+
+    ``expr`` is an opaque SQL expression string — soyuz never parses
+    it (there is no query side to validate it against; the consumer's
+    compiler is where a malformed expression surfaces). ``name`` is
+    the column name the compiled view exposes, so it shares one flat
+    namespace with measure names — uniqueness across the combined set
+    is enforced by the service layer.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1)
+    expr: str = Field(min_length=1)
+    comment: str | None = None
+
+
+class MetricViewMeasure(BaseModel):
+    """One measure in a metric-view spec.
+
+    Same shape as :class:`MetricViewDimension`; kept as a separate
+    class because the two lists carry different compile-time
+    semantics in the consumer (GROUP BY columns vs. aggregations)
+    and a future revision may grow measure-only fields (e.g. a
+    window specification) without disturbing dimensions.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1)
+    expr: str = Field(min_length=1)
+    comment: str | None = None
+
+
+class MetricViewSpec(BaseModel):
+    """The semantic-layer definition stored on a metric view.
+
+    ``measures`` requires at least one entry (``min_length=1`` —
+    surfacing as 422): a metric view without a measure is just a
+    projection and belongs in a plain SQL view. ``dimensions`` may be
+    empty (a single-row summary view is legitimate). ``filter`` is an
+    optional opaque SQL predicate applied by the consumer before
+    aggregation.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    dimensions: list[MetricViewDimension] = Field(default_factory=list)
+    measures: list[MetricViewMeasure] = Field(min_length=1)
+    filter: str | None = None
+
+
+class MetricViewInfo(BaseModel):
+    """Response shape for a metric view.
+
+    Over-the-spec addition (ADR-0014): upstream UC OSS ``all.yaml``
+    has no semantic-layer schema, so this shape is soyuz' contract.
+    ``catalog_name`` / ``schema_name`` / ``full_name`` are
+    reconstructed from the live parent chain at response time — same
+    rename-invariance trick :class:`TableInfo` uses.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str | None = None
+    catalog_name: str | None = None
+    schema_name: str | None = None
+    full_name: str | None = None
+    source_table_full_name: str | None = None
+    spec: MetricViewSpec | None = None
+    comment: str | None = None
+    owner: str | None = None
+    id: str | None = None
+    created_at: int | None = None
+    created_by: str | None = None
+    updated_at: int | None = None
+    updated_by: str | None = None
+
+
+class CreateMetricView(BaseModel):
+    """Request body for ``POST /metric-views``.
+
+    ``source_table_full_name`` must be a syntactically valid
+    three-part name but is *not* resolved against the tables surface
+    — a metric view may be authored before its source table is
+    registered, exactly like a SQL view body referencing a yet-to-be
+    created table. The parent catalog and schema, by contrast, must
+    exist (404 otherwise). ``extra="forbid"`` rejects unknown fields
+    with 422 instead of silently dropping them.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1)
+    catalog_name: str = Field(min_length=1)
+    schema_name: str = Field(min_length=1)
+    source_table_full_name: str = Field(min_length=1)
+    spec: MetricViewSpec
+    comment: str | None = None
+    owner: str | None = None
+
+
+class UpdateMetricView(BaseModel):
+    """Request body for ``PATCH /metric-views/{full_name}``.
+
+    Replace-style PATCH semantics driven by ``model_fields_set`` in
+    the service layer: ``spec`` replaces the whole stored definition
+    (a per-dimension merge would have no predictable semantics), and
+    an empty body is a no-op. ``new_name`` renames within the same
+    schema — moving a metric view across schemas is a
+    delete-and-recreate, same posture as every other child resource.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    new_name: str | None = None
+    source_table_full_name: str | None = None
+    spec: MetricViewSpec | None = None
+    comment: str | None = None
+    owner: str | None = None
+
+
+class ListMetricViewsResponse(BaseModel):
+    """Response shape for ``GET /metric-views``.
+
+    Keyset pagination via ``next_page_token``; same shape as every
+    other list response in this module.
+    """
+
+    metric_views: list[MetricViewInfo]
+    next_page_token: str | None = None

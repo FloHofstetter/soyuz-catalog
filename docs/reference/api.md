@@ -257,9 +257,10 @@ Delete a schema.
 **Query parameters**:
 
 - `force` (bool, optional) — cascade flag. When `false` and the schema still
-  owns tables or volumes, the delete is rejected with `409 ALREADY_EXISTS`.
-  When `true`, cascades through every child table (and its columns) and
-  every child volume.
+  owns tables, volumes, functions, registered models, or metric views, the
+  delete is rejected with `409 ALREADY_EXISTS`. When `true`, cascades
+  through every child of all five kinds (tables together with their
+  columns, registered models together with their versions).
 
 **Response**: `200 OK` with `{}`, `404 NOT_FOUND`, or
 `400 INVALID_ARGUMENT` on a malformed `full_name`.
@@ -640,6 +641,86 @@ Delete.
   catalog is deleted first via the regular catalog cascade
   (schemas → tables/volumes/functions/models, grants wiped along
   the way) before the connection row itself is removed.
+
+## Metric views (over-the-spec)
+
+Over-the-spec extension ([ADR-0014](../adr/0014-metric-views.md)).
+A semantic-layer definition store: each metric view bundles named
+dimensions and measures over one source table, addressed by the same
+three-part `catalog.schema.name` full name tables use. soyuz stores
+and shape-validates the definition only — compiling the view into
+SQL and executing it is the consumer's job, and the `expr` strings
+are opaque to soyuz. Upstream UC OSS `all.yaml` defines no
+semantic-layer surface, so these routes are flagged in
+[Divergences](../divergences.md) and skipped by the conformance
+subset check.
+
+### `POST /metric-views`
+
+Create a new metric view under an existing schema.
+
+**Request body** (`CreateMetricView`):
+
+| Field                    | Type             | Required | Notes                                       |
+|--------------------------|------------------|----------|---------------------------------------------|
+| `name`                   | string           | yes      | Metric view name (unique per schema)        |
+| `catalog_name`           | string           | yes      | Parent catalog (must exist)                 |
+| `schema_name`            | string           | yes      | Parent schema (must exist)                  |
+| `source_table_full_name` | string           | yes      | Three-part `catalog.schema.table` reference; shape-checked but **not** resolved |
+| `spec`                   | `MetricViewSpec` | yes      | See below                                   |
+| `comment`                | string           | no       | Free-form description                       |
+| `owner`                  | string           | no       | Owner principal                             |
+
+**`MetricViewSpec`**:
+
+| Field        | Type                             | Required | Notes                                        |
+|--------------|----------------------------------|----------|----------------------------------------------|
+| `dimensions` | list of `{name, expr, comment?}` | no       | May be empty                                 |
+| `measures`   | list of `{name, expr, comment?}` | yes      | At least one entry                           |
+| `filter`     | string                           | no       | Opaque SQL predicate applied pre-aggregation |
+
+**Response**: `200 OK` with a `MetricViewInfo` body (includes the
+computed `full_name`).
+
+**Errors**:
+
+- `404 NOT_FOUND` — parent catalog or schema does not exist.
+- `409 ALREADY_EXISTS` — duplicate `name` under the schema.
+- `400 INVALID_ARGUMENT` — `source_table_full_name` is not a
+  three-part name, or a dimension/measure name appears twice across
+  the combined set (the compiled view exposes them in one flat
+  column namespace).
+- `422` — missing required field, unknown field, empty `measures`,
+  or empty `name` / `expr` strings.
+
+### `GET /metric-views`
+
+List metric views under a schema with keyset pagination. Requires
+`catalog_name` and `schema_name` query parameters; a bogus parent
+address surfaces as `404`, not an empty page. See
+[Pagination](#pagination).
+
+### `GET /metric-views/{full_name}`
+
+Fetch by three-part full name. `404 NOT_FOUND` if any of catalog,
+schema, or metric view is missing; `400 INVALID_ARGUMENT` when the
+name is not exactly three dot-separated parts.
+
+### `PATCH /metric-views/{full_name}`
+
+Replace-style PATCH. `new_name`, `source_table_full_name`, `spec`,
+`comment`, and `owner` are updatable. `spec` replaces the whole
+stored definition (a per-dimension merge would have no predictable
+semantics) and is re-run through the duplicate-name gate. Empty body
+is a no-op. A rename collides on the per-schema unique constraint
+with `409`.
+
+### `DELETE /metric-views/{full_name}`
+
+Delete. No `force` flag — metric views own no child resources.
+Deleting the parent schema or catalog requires `force=true` while
+metric views exist underneath, and the force-cascade removes them
+(same gate as tables / volumes / functions / models).
 
 ## Functions
 

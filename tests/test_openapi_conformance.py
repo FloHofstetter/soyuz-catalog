@@ -177,6 +177,14 @@ def test_soyuz_paths_are_subset_of_uc_spec() -> None:
             # UC OSS / all.yaml do not. Documented in DIVERGENCES.md
             # under "Connections and foreign catalogs".
             continue
+        if path.startswith(f"{PREFIX}/metric-views"):
+            # Metric views are an over-the-spec extension (ADR-0014).
+            # Databricks ships a semantic layer; UC OSS / all.yaml do
+            # not. Mounted under the UC prefix (like connections)
+            # because metric views live in the same
+            # catalog.schema.name hierarchy as tables. Documented in
+            # DIVERGENCES.md under "Metric views".
+            continue
         if path.startswith(f"{PREFIX}/effective-permissions/"):
             # Effective permissions is an over-the-spec extension.
             # Upstream ``all.yaml`` defines only the direct-grant

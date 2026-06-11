@@ -85,6 +85,21 @@ from soyuz_catalog_client.api.functions import (
 from soyuz_catalog_client.api.metastore import (  # noqa: E402
     get_metastore_summary_api_2_1_unity_catalog_metastore_summary_get as _get_metastore_summary,
 )
+from soyuz_catalog_client.api.metric_views import (  # noqa: E402
+    create_metric_view_api_2_1_unity_catalog_metric_views_post as _create_metric_view,
+)
+from soyuz_catalog_client.api.metric_views import (
+    delete_metric_view_api_2_1_unity_catalog_metric_views_full_name_delete as _delete_metric_view,
+)
+from soyuz_catalog_client.api.metric_views import (
+    get_metric_view_api_2_1_unity_catalog_metric_views_full_name_get as _get_metric_view,
+)
+from soyuz_catalog_client.api.metric_views import (
+    list_metric_views_api_2_1_unity_catalog_metric_views_get as _list_metric_views,
+)
+from soyuz_catalog_client.api.metric_views import (
+    update_metric_view_api_2_1_unity_catalog_metric_views_full_name_patch as _update_metric_view,
+)
 from soyuz_catalog_client.api.model_versions import (  # noqa: E402
     create_model_version_api_2_1_unity_catalog_models_versions_post as _create_model_version,
 )
@@ -131,6 +146,7 @@ from soyuz_catalog_client.models import (  # noqa: E402
     CreateFunctionRequest,
     CreateFunctionRoutineBody,
     CreateFunctionSqlDataAccess,
+    CreateMetricView,
     CreateModelVersion,
     CreateRegisteredModel,
     CreateSchema,
@@ -144,6 +160,10 @@ from soyuz_catalog_client.models import (  # noqa: E402
     GenerateTemporaryPathCredentialOperation,
     GetMetastoreSummaryResponse,
     ListCredentialsResponse,
+    ListMetricViewsResponse,
+    MetricViewInfo,
+    MetricViewMeasure,
+    MetricViewSpec,
     ModelVersionInfo,
     Options,
     PermissionsChange,
@@ -153,6 +173,7 @@ from soyuz_catalog_client.models import (  # noqa: E402
     StagingTableInfo,
     TemporaryCredentials,
     UpdateCredentialRequest,
+    UpdateMetricView,
     UpdatePermissions,
 )
 
@@ -556,3 +577,53 @@ def test_generated_client_connection_crud(live_server: str) -> None:
     _delete_connection.sync(client=client, name=renamed_name, force=True)
     with pytest.raises(Exception):
         _get_connection.sync(client=client, name=renamed_name)
+
+
+# ---------------------------------------------------------------------------
+# Metric views (over-the-spec extension, ADR-0014)
+# ---------------------------------------------------------------------------
+
+
+def test_generated_client_metric_view_crud(live_server: str) -> None:
+    client = make_generated_client(live_server)
+    catalog, schema = _make_parent(client)
+    name = f"mv_{_suffix()}"
+    full_name = f"{catalog}.{schema}.{name}"
+
+    created = _create_metric_view.sync(
+        client=client,
+        body=CreateMetricView(
+            name=name,
+            catalog_name=catalog,
+            schema_name=schema,
+            source_table_full_name=f"{catalog}.{schema}.orders",
+            spec=MetricViewSpec(
+                measures=[MetricViewMeasure(name="revenue", expr="SUM(amount)")],
+            ),
+            comment="initial",
+        ),
+    )
+    assert isinstance(created, MetricViewInfo)
+    assert created.full_name == full_name
+    assert created.spec is not None
+    assert [m.name for m in created.spec.measures] == ["revenue"]
+
+    fetched = _get_metric_view.sync(client=client, full_name=full_name)
+    assert isinstance(fetched, MetricViewInfo)
+    assert fetched.id == created.id
+
+    listed = _list_metric_views.sync(client=client, catalog_name=catalog, schema_name=schema)
+    assert isinstance(listed, ListMetricViewsResponse)
+    assert any(v.name == name for v in listed.metric_views)
+
+    updated = _update_metric_view.sync(
+        client=client,
+        full_name=full_name,
+        body=UpdateMetricView(comment="edited"),
+    )
+    assert isinstance(updated, MetricViewInfo)
+    assert updated.comment == "edited"
+
+    _delete_metric_view.sync(client=client, full_name=full_name)
+    with pytest.raises(Exception):
+        _get_metric_view.sync(client=client, full_name=full_name)

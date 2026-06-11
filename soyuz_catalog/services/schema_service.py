@@ -13,6 +13,7 @@ from soyuz_catalog.exceptions import ConflictError, InvalidRequestError, NotFoun
 from soyuz_catalog.models import (
     Catalog,
     Function,
+    MetricView,
     RegisteredModel,
     Schema,
     Table,
@@ -261,15 +262,16 @@ def update_schema(
 def delete_schema(session: Session, full_name: str, force: bool = False) -> None:
     """Delete a schema.
 
-    If the schema has any child tables, volumes, functions, or
-    registered models and ``force`` is false, the delete is rejected
-    with :class:`ConflictError` (HTTP 409, ``FAILED_PRECONDITION``).
-    With ``force=true``, all four child kinds are cascaded — tables
-    and volumes via the ORM relationships' ``cascade="all,
-    delete-orphan"``; functions and registered models (together with
-    the latter's own versions) via explicit bulk DELETE statements
-    because those classes do not have back-populating relationships
-    on :class:`Schema`.
+    If the schema has any child tables, volumes, functions,
+    registered models, or metric views and ``force`` is false, the
+    delete is rejected with :class:`ConflictError` (HTTP 409,
+    ``FAILED_PRECONDITION``). With ``force=true``, all five child
+    kinds are cascaded — tables and volumes via the ORM
+    relationships' ``cascade="all, delete-orphan"``; functions,
+    registered models (together with the latter's own versions), and
+    metric views via explicit bulk DELETE statements because those
+    classes do not have back-populating relationships on
+    :class:`Schema`.
 
     Each child kind is checked independently so the rejection
     message can name whichever side(s) blocked the delete.
@@ -278,8 +280,9 @@ def delete_schema(session: Session, full_name: str, force: bool = False) -> None
         session: Active SQLAlchemy session.
         full_name: ``catalog.schema`` path parameter.
         force: When true, cascade-delete all child tables, volumes,
-            functions, and registered models (and their sub-rows).
-            When false, refuse the delete if any children exist.
+            functions, registered models (and their sub-rows), and
+            metric views. When false, refuse the delete if any
+            children exist.
 
     Raises:
         ConflictError: If the schema still has any child resources
@@ -300,7 +303,12 @@ def delete_schema(session: Session, full_name: str, force: bool = False) -> None
         .select_from(RegisteredModel)
         .where(RegisteredModel.schema_id == schema.id),
     )
-    if (table_count or volume_count or function_count or model_count) and not force:
+    metric_view_count = session.scalar(
+        select(func.count()).select_from(MetricView).where(MetricView.schema_id == schema.id),
+    )
+    if (
+        table_count or volume_count or function_count or model_count or metric_view_count
+    ) and not force:
         blockers: list[str] = []
         if table_count:
             blockers.append("tables")
@@ -310,6 +318,8 @@ def delete_schema(session: Session, full_name: str, force: bool = False) -> None
             blockers.append("functions")
         if model_count:
             blockers.append("registered models")
+        if metric_view_count:
+            blockers.append("metric views")
         raise ConflictError(
             f"Cannot delete schema '{full_name}' because it still has "
             f"{' and '.join(blockers)}. Pass force=true to cascade.",
@@ -341,6 +351,12 @@ def delete_schema(session: Session, full_name: str, force: bool = False) -> None
     from soyuz_catalog.services.constraints_service import delete_constraints_for_tables
 
     delete_constraints_for_tables(session, table_ids)
+    # Metric-views cascade (ADR-0014): same FK-without-relationship
+    # shape as functions — the rows must go through an explicit bulk
+    # DELETE before the schema row disappears.
+    from soyuz_catalog.services.metric_view_service import delete_metric_views_for_schemas
+
+    delete_metric_views_for_schemas(session, [schema.id])
     if function_count:
         session.execute(delete(Function).where(Function.schema_id == schema.id))
     if model_count:

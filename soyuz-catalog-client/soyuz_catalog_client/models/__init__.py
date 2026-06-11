@@ -40,6 +40,7 @@ from .create_function_routine_dependencies_type_0 import (
     CreateFunctionRoutineDependenciesType0,
 )
 from .create_function_sql_data_access import CreateFunctionSqlDataAccess
+from .create_metric_view import CreateMetricView
 from .create_model_version import CreateModelVersion
 from .create_registered_model import CreateRegisteredModel
 from .create_schema import CreateSchema
@@ -126,12 +127,17 @@ from .list_connections_response import ListConnectionsResponse
 from .list_credentials_response import ListCredentialsResponse
 from .list_external_locations_response import ListExternalLocationsResponse
 from .list_functions_response import ListFunctionsResponse
+from .list_metric_views_response import ListMetricViewsResponse
 from .list_model_versions_response import ListModelVersionsResponse
 from .list_registered_models_response import ListRegisteredModelsResponse
 from .list_schemas_response import ListSchemasResponse
 from .list_tables_response import ListTablesResponse
 from .list_volumes_response import ListVolumesResponse
 from .metadata import Metadata
+from .metric_view_dimension import MetricViewDimension
+from .metric_view_info import MetricViewInfo
+from .metric_view_measure import MetricViewMeasure
+from .metric_view_spec import MetricViewSpec
 from .metrics_report import MetricsReport
 from .model_version_info import ModelVersionInfo
 from .model_version_info_status_type_0 import ModelVersionInfoStatusType0
@@ -175,6 +181,9 @@ from .response_delete_external_location_api_21_unity_catalog_external_locations_
 )
 from .response_delete_function_api_21_unity_catalog_functions_full_name_delete import (
     ResponseDeleteFunctionApi21UnityCatalogFunctionsFullNameDelete,
+)
+from .response_delete_metric_view_api_21_unity_catalog_metric_views_full_name_delete import (
+    ResponseDeleteMetricViewApi21UnityCatalogMetricViewsFullNameDelete,
 )
 from .response_delete_model_version_api_21_unity_catalog_models_full_name_versions_version_delete import (
     ResponseDeleteModelVersionApi21UnityCatalogModelsFullNameVersionsVersionDelete,
@@ -231,6 +240,7 @@ from .update_connection import UpdateConnection
 from .update_connection_options_type_0 import UpdateConnectionOptionsType0
 from .update_credential_request import UpdateCredentialRequest
 from .update_external_location import UpdateExternalLocation
+from .update_metric_view import UpdateMetricView
 from .update_model_version import UpdateModelVersion
 from .update_permissions import UpdatePermissions
 from .update_permissions_api_21_unity_catalog_permissions_securable_type_full_name_patch_securable_type import (
@@ -287,6 +297,7 @@ __all__ = (
     "CreateFunctionRoutineBody",
     "CreateFunctionRoutineDependenciesType0",
     "CreateFunctionSqlDataAccess",
+    "CreateMetricView",
     "CreateModelVersion",
     "CreateRegisteredModel",
     "CreateSchema",
@@ -351,6 +362,7 @@ __all__ = (
     "ListCredentialsResponse",
     "ListExternalLocationsResponse",
     "ListFunctionsResponse",
+    "ListMetricViewsResponse",
     "ListModelVersionsResponse",
     "ListRegisteredModelsResponse",
     "ListSchemasResponse",
@@ -358,6 +370,10 @@ __all__ = (
     "ListVolumesResponse",
     "Metadata",
     "MetricsReport",
+    "MetricViewDimension",
+    "MetricViewInfo",
+    "MetricViewMeasure",
+    "MetricViewSpec",
     "ModelVersionInfo",
     "ModelVersionInfoStatusType0",
     "NotNullConstraint",
@@ -387,6 +403,7 @@ __all__ = (
     "ResponseDeleteCredentialApi21UnityCatalogCredentialsNameDelete",
     "ResponseDeleteExternalLocationApi21UnityCatalogExternalLocationsNameDelete",
     "ResponseDeleteFunctionApi21UnityCatalogFunctionsFullNameDelete",
+    "ResponseDeleteMetricViewApi21UnityCatalogMetricViewsFullNameDelete",
     "ResponseDeleteModelVersionApi21UnityCatalogModelsFullNameVersionsVersionDelete",
     "ResponseDeleteRegisteredModelApi21UnityCatalogModelsFullNameDelete",
     "ResponseDeleteSchemaApi21UnityCatalogSchemasFullNameDelete",
@@ -426,6 +443,7 @@ __all__ = (
     "UpdateConnectionOptionsType0",
     "UpdateCredentialRequest",
     "UpdateExternalLocation",
+    "UpdateMetricView",
     "UpdateModelVersion",
     "UpdatePermissions",
     "UpdatePermissionsApi21UnityCatalogPermissionsSecurableTypeFullNamePatchSecurableType",

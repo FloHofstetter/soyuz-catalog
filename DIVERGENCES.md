@@ -1490,3 +1490,68 @@ Regression tests: `tests/test_connections_crud.py` (CRUD
 matrix, rename, pagination, force-cascade) and
 `tests/test_catalogs_foreign.py` (create mixed shapes, PATCH
 type-immutability, connection rebind, rename propagation).
+
+## Metric views
+
+**soyuz-specific, over-the-spec extension. See ADR-0014.** Databricks
+ships metric views as a first-class semantic-layer securable; upstream
+UC OSS and `all.yaml` have no semantic-layer surface at all. soyuz
+adds a definition store mounted under the UC prefix:
+
+```text
+POST   /api/2.1/unity-catalog/metric-views
+GET    /api/2.1/unity-catalog/metric-views?catalog_name=&schema_name=
+GET    /api/2.1/unity-catalog/metric-views/{full_name}
+PATCH  /api/2.1/unity-catalog/metric-views/{full_name}
+DELETE /api/2.1/unity-catalog/metric-views/{full_name}
+```
+
+The test at
+`tests/test_openapi_conformance.py::test_soyuz_paths_are_subset_of_uc_spec`
+skips this prefix explicitly; the endpoint set lives here rather than
+`all.yaml` because it is deliberately an over-the-spec feature, not a
+spec drift.
+
+### Definition store only — no compilation, no execution
+
+soyuz stores and shape-validates the dimension/measure definition;
+the consumer compiles it into SQL and executes it. `expr` and
+`filter` strings are opaque — soyuz never parses SQL (there is no
+query side to validate a dialect against, same argument as the
+per-connector option validation rejected in ADR-0013).
+
+### Validation split: 404 / 409 / 400 / 422
+
+The parent catalog + schema must exist (404 otherwise — same
+address-does-not-resolve contract as tables), names are unique per
+schema (409 via the `(schema_id, name)` constraint), an empty
+`measures` list and unknown fields are pydantic-level rejections
+(422), and the two semantic gates — a non-three-part
+`source_table_full_name` and a duplicate name across the combined
+dimensions + measures namespace — surface as 400 `INVALID_ARGUMENT`
+from the service layer.
+
+### The source-table reference is name-keyed and unresolved
+
+`source_table_full_name` is shape-checked but **not** resolved
+against the tables surface and does not track source renames: a
+metric view may be authored before its source table is registered
+(the same way a SQL view body can reference a yet-to-be-created
+table), and a rebuilt source table keeps the reference valid even
+though its opaque id changed. This is a deliberate exception to the
+opaque-id rename-invariance rule the *parent* binding still follows
+(`schema_id` / `catalog_id` are opaque ids, so catalog/schema renames
+propagate into `full_name` for free). See ADR-0014's Alternatives for
+the trade-off.
+
+### Parent deletes gate on metric views
+
+`DELETE /schemas/{full_name}` and `DELETE /catalogs/{name}` without
+`force` are rejected with 409 while metric views exist underneath;
+`force=true` bulk-deletes them through the
+`metric_view_service.delete_metric_views_for_schemas` cascade hook —
+same pattern as the declared-constraints cascade (ADR-0012).
+
+Regression tests: `tests/test_metric_views.py` (CRUD matrix, spec
+validation, pagination, parent-rename propagation, schema/catalog
+cascade, audit actions).

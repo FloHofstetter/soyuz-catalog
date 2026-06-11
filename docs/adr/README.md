@@ -84,6 +84,9 @@ clients expect them.
 - [ADR-0013 — Connections and foreign catalogs](0013-connections-and-foreign-catalogs.md).
   Lakehouse Federation: typed references to external metadata sources
   plus foreign-catalog variants of the standard catalog routes.
+- [ADR-0014 — Metric views](0014-metric-views.md). Semantic-layer
+  dimension/measure definitions stored and validated by soyuz,
+  compiled and executed by the consumer.
 
 ## Operational
 
@@ -121,3 +124,4 @@ context.
 | [0011](0011-delta-commit-coordinator.md) | Delta commit coordinator — passthrough implementation | Accepted |
 | [0012](0012-table-constraints.md) | Table constraints | Accepted |
 | [0013](0013-connections-and-foreign-catalogs.md) | Connections and foreign catalogs | Accepted |
+| [0014](0014-metric-views.md) | Metric views | Accepted |

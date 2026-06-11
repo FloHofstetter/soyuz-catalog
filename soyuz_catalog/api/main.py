@@ -26,6 +26,7 @@ from soyuz_catalog.api.routes.external_locations import router as external_locat
 from soyuz_catalog.api.routes.functions import router as functions_router
 from soyuz_catalog.api.routes.lineage import router as lineage_router
 from soyuz_catalog.api.routes.metastore import router as metastore_router
+from soyuz_catalog.api.routes.metric_views import router as metric_views_router
 from soyuz_catalog.api.routes.model_versions import router as model_versions_router
 from soyuz_catalog.api.routes.permissions import router as permissions_router
 from soyuz_catalog.api.routes.registered_models import router as registered_models_router
@@ -72,8 +73,9 @@ soyuz-catalog implements the upstream UC spec
 (`api/all.yaml`) plus a small set of over-the-spec extensions
 ([OpenLineage ingest][adr-08], [tags][adr-10],
 [table constraints][adr-12], [Lakehouse Federation][adr-13],
-effective-permissions traversal, audit-log read) and a secondary
-[Delta REST Catalog][adr-09] surface against the same storage.
+[metric views][adr-14], effective-permissions traversal, audit-log
+read) and a secondary [Delta REST Catalog][adr-09] surface against
+the same storage.
 
 - **Spec source of truth:** `unitycatalog/api/all.yaml` ([ADR-0002][adr-02]).
 - **Stack:** FastAPI + SQLAlchemy 2.0 (sync) + Pydantic v2 + Alembic.
@@ -87,6 +89,7 @@ effective-permissions traversal, audit-log read) and a secondary
 [adr-10]: https://github.com/FloHofstetter/soyuz-catalog/blob/main/docs/adr/0010-tags-as-extension.md
 [adr-12]: https://github.com/FloHofstetter/soyuz-catalog/blob/main/docs/adr/0012-table-constraints.md
 [adr-13]: https://github.com/FloHofstetter/soyuz-catalog/blob/main/docs/adr/0013-connections-and-foreign-catalogs.md
+[adr-14]: https://github.com/FloHofstetter/soyuz-catalog/blob/main/docs/adr/0014-metric-views.md
 """
 
 
@@ -111,6 +114,10 @@ _OPENAPI_TAGS: list[dict[str, str]] = [
     {
         "name": "connections",
         "description": "Lakehouse Federation connections (extension; ADR-0013).",
+    },
+    {
+        "name": "metric-views",
+        "description": "Semantic-layer metric view definitions (extension; ADR-0014).",
     },
     {
         "name": "tags",
@@ -231,6 +238,13 @@ def create_app() -> FastAPI:
     # under the same ``/catalogs`` surface as managed ones; keeping
     # the connection CRUD next to catalogs minimises URL surprises.
     app.include_router(connections_router, prefix=settings.api_prefix)
+    # Metric views are an over-the-spec extension (ADR-0014) — a
+    # semantic-layer definition store, not in UC OSS ``all.yaml``.
+    # Mounted under the UC prefix (like connections) because metric
+    # views live in the same catalog.schema.name hierarchy as tables;
+    # keeping the CRUD next to the other three-part resources
+    # minimises URL surprises.
+    app.include_router(metric_views_router, prefix=settings.api_prefix)
     app.include_router(functions_router, prefix=settings.api_prefix)
     app.include_router(registered_models_router, prefix=settings.api_prefix)
     app.include_router(model_versions_router, prefix=settings.api_prefix)

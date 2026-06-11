@@ -107,6 +107,17 @@ metadata-only posture and wire shape.
 
 ::: soyuz_catalog.services.constraints_service
 
+## Metric view service
+
+Over-the-spec extension: semantic-layer metric view definitions
+(dimensions + measures over a source table). Databricks ships metric
+views but UC OSS and `all.yaml` do not; see
+[ADR-0014](../../adr/0014-metric-views.md) for the rationale and
+`DIVERGENCES.md` under **Metric views** for the definition-store-only
+posture and wire shape.
+
+::: soyuz_catalog.services.metric_view_service
+
 ## Keyset pagination helpers
 
 Shared list-pagination helpers used by every `list_*` service call

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Metric views** (over-the-spec extension, ADR-0014): a
+  semantic-layer definition store under
+  `/api/2.1/unity-catalog/metric-views`. Each metric view bundles
+  named dimensions and measures (plus an optional filter predicate)
+  over a three-part source-table reference, addressed by the same
+  `catalog.schema.name` full names tables use. Full CRUD + keyset
+  list, parent-existence 404 gates, per-schema uniqueness, a
+  flat-namespace duplicate-name gate across dimensions + measures,
+  audit-log entries for every mutation, and schema/catalog
+  force-delete cascade (409 blockers without `force`). soyuz stores
+  and validates the definition only — compiling and executing the
+  view is the consumer's job, and `expr` strings are opaque.
+  Documented in `DIVERGENCES.md` under **Metric views**; excluded
+  from the spec-conformance subset check like the other extensions.
+  New `metric_views` table (Alembic 017).
+
 ## [0.2.1] - 2026-06-09
 
 ### Fixed

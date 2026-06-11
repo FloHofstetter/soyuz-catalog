@@ -328,5 +328,12 @@ def delete_catalog(session: Session, name: str, force: bool = False) -> None:
     from soyuz_catalog.services.constraints_service import delete_constraints_for_tables
 
     delete_constraints_for_tables(session, table_ids)
+    # Metric-views cascade (ADR-0014): see ``delete_schema`` — the
+    # subtree cascade must bulk-delete metric view rows explicitly
+    # because :class:`Schema` has no back-populating relationship to
+    # them.
+    from soyuz_catalog.services.metric_view_service import delete_metric_views_for_schemas
+
+    delete_metric_views_for_schemas(session, schema_ids)
     session.delete(catalog)
     session.commit()
