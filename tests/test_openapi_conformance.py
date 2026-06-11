@@ -185,6 +185,23 @@ def test_soyuz_paths_are_subset_of_uc_spec() -> None:
             # catalog.schema.name hierarchy as tables. Documented in
             # DIVERGENCES.md under "Metric views".
             continue
+        if path.startswith(f"{PREFIX}/shares"):
+            # Delta Sharing management surface (ADR-0015). Databricks
+            # ships shares as UC securables; UC OSS / all.yaml do not.
+            # Documented in DIVERGENCES.md under "Delta Sharing".
+            continue
+        if path.startswith(f"{PREFIX}/recipients"):
+            # Delta Sharing recipients (ADR-0015) — the bearer-token
+            # identities of the protocol surface. Same posture as
+            # /shares above.
+            continue
+        if path.startswith("/delta-sharing/"):
+            # The open Delta Sharing protocol surface (ADR-0015).
+            # Root-mounted like lineage because the path layout is an
+            # external wire contract (PROTOCOL.md), not a UC spec
+            # path. Documented in DIVERGENCES.md under "Delta
+            # Sharing".
+            continue
         if path.startswith(f"{PREFIX}/effective-permissions/"):
             # Effective permissions is an over-the-spec extension.
             # Upstream ``all.yaml`` defines only the direct-grant

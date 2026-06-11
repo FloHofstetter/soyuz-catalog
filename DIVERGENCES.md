@@ -1555,3 +1555,107 @@ same pattern as the declared-constraints cascade (ADR-0012).
 Regression tests: `tests/test_metric_views.py` (CRUD matrix, spec
 validation, pagination, parent-rename propagation, schema/catalog
 cascade, audit actions).
+
+## Delta Sharing
+
+**soyuz-specific, over-the-spec extension. See ADR-0015.** Databricks
+ships shares and recipients as UC securables and serves the open
+[Delta Sharing protocol](https://github.com/delta-io/delta-sharing/blob/main/PROTOCOL.md);
+upstream UC OSS and `all.yaml` define none of it. soyuz adds both
+halves:
+
+```text
+# Management (UC prefix, no auth — proxy-owned per ADR-0005)
+POST   /api/2.1/unity-catalog/shares
+GET    /api/2.1/unity-catalog/shares
+GET    /api/2.1/unity-catalog/shares/{name}
+PATCH  /api/2.1/unity-catalog/shares/{name}
+DELETE /api/2.1/unity-catalog/shares/{name}
+POST   /api/2.1/unity-catalog/shares/{name}/objects
+DELETE /api/2.1/unity-catalog/shares/{name}/objects?table_full_name=
+PUT    /api/2.1/unity-catalog/shares/{name}/recipients/{recipient_name}
+DELETE /api/2.1/unity-catalog/shares/{name}/recipients/{recipient_name}
+POST   /api/2.1/unity-catalog/recipients
+GET    /api/2.1/unity-catalog/recipients
+GET    /api/2.1/unity-catalog/recipients/{name}
+PATCH  /api/2.1/unity-catalog/recipients/{name}
+DELETE /api/2.1/unity-catalog/recipients/{name}
+POST   /api/2.1/unity-catalog/recipients/{name}/rotate-token
+
+# Protocol (root-mounted, recipient bearer-token auth)
+GET    /delta-sharing/shares
+GET    /delta-sharing/shares/{share}
+GET    /delta-sharing/shares/{share}/schemas
+GET    /delta-sharing/shares/{share}/schemas/{schema}/tables
+GET    /delta-sharing/shares/{share}/all-tables
+GET    /delta-sharing/shares/{share}/schemas/{schema}/tables/{table}/version
+GET    /delta-sharing/shares/{share}/schemas/{schema}/tables/{table}/metadata
+POST   /delta-sharing/shares/{share}/schemas/{schema}/tables/{table}/query
+GET    /delta-sharing/files/{file_id}?token=   (pre-signed, no bearer)
+```
+
+The conformance test skips `{PREFIX}/shares`, `{PREFIX}/recipients`,
+and `/delta-sharing/` explicitly — over-the-spec features, not spec
+drift.
+
+### The protocol surface is authenticated — the one exception to ADR-0005
+
+Every `/delta-sharing/` route (except the pre-signed file download)
+requires `Authorization: Bearer <recipient token>`. The bearer token
+is part of the open protocol's wire contract — recipients embed it in
+their profile file and off-the-shelf clients attach it themselves —
+so it cannot be delegated to a front proxy the way UC auth is.
+Tokens are stored as SHA-256 hashes only; the plaintext is returned
+exactly once per generation (create / rotate) and never appears in
+audit rows. Missing, malformed, and unknown tokens are the same 401.
+
+### Protocol error envelope and camelCase shapes
+
+`/delta-sharing/` errors are `{"errorCode": ..., "message": ...}` per
+PROTOCOL.md — **not** the soyuz `error_code` / `request_id` envelope.
+Pagination is `maxResults` / `pageToken` / `nextPageToken`
+(camelCase), `nextPageToken` is omitted (not null) on the last page,
+NDJSON responses carry `application/x-ndjson` and the
+`Delta-Table-Version` header, and the `query` request body is the
+project's second `extra="allow"` exception (after OpenLineage):
+newer-protocol fields like `maxFiles` are tolerated, and
+`predicateHints` / `jsonPredicateHints` / `limitHint` are accepted
+and ignored as the protocol allows.
+
+### Shares bind tables by name, not opaque id
+
+`share_objects` stores the three-part `table_full_name` (resolved for
+existence at add time) and re-resolves it live on every protocol
+read. Renaming or dropping a shared table therefore drops it out of
+the share — protocol reads 404 until it is re-added — a deliberate
+exception to the rename-invariance rule, because the protocol itself
+addresses tables by name and recipients hold those names in saved
+queries. `shared_as` (two-part `schema.table`) re-homes a table
+inside the share's namespace; the *effective placement* must be
+unique per share (409 at add time).
+
+### File URLs are self-served signed handles
+
+Cloud Delta Sharing servers return object-store pre-signed URLs;
+soyuz tables are `file://`-backed, so each `file.url` points back at
+`GET /delta-sharing/files/{file_id}?token=…` on the same server. The
+token is a stateless HMAC-SHA256 over absolute path + file id +
+expiry (key: `SOYUZ_SHARING_SIGNING_KEY`, default per-process random;
+TTL: `SOYUZ_SHARING_FILE_URL_TTL_SECONDS`, default 900, surfaced as
+`expirationTimestamp`). Tampered, cross-file, and expired handles are
+all 403; add-action paths are verified under the table root before
+signing so a crafted `_delta_log` cannot reach outside the table
+directory. Cloud storage schemes return 501 (the house cloud-deferral
+posture), as do timestamp / CDF queries (`startingTimestamp`,
+`timestamp`, `startingVersion`, `endingVersion`). Tables whose Delta
+protocol requires `minReaderVersion > 1` (column mapping, deletion
+vectors) are refused with 400 `UNSUPPORTED_TABLE_FEATURES` rather
+than served as silently-wrong parquet; `stats` carries `numRecords`
+only.
+
+Regression tests: `tests/test_sharing_management.py` (CRUD matrix,
+token-hash invariants, grants, cascades, audit) and
+`tests/test_sharing_protocol.py` (auth failures, derived namespace +
+`shared_as`, NDJSON shapes, version pinning, signed-handle attack
+paths, and an end-to-end share → query → download → parquet-bytes
+round-trip against a real Delta table).

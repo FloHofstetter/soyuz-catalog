@@ -146,3 +146,32 @@ class TooManyRequestsError(SoyuzError):
 
     error_code = "TOO_MANY_REQUESTS"
     status_code = 429
+
+
+class SharingProtocolError(Exception):
+    """Domain error for the recipient-facing Delta Sharing protocol surface.
+
+    Deliberately **not** a :class:`SoyuzError` subclass: the open Delta
+    Sharing protocol pins its own error envelope —
+    ``{"errorCode": ..., "message": ...}`` — which differs from the
+    soyuz envelope (``error_code`` / ``message`` / ``request_id``).
+    Routing these through the ``SoyuzError`` handler would leak the
+    wrong wire shape to protocol clients, so the API layer registers a
+    dedicated handler that serialises this class per the protocol.
+    Only code under the ``/delta-sharing/`` surface raises it; the
+    sharing *management* routes use the normal soyuz exceptions.
+
+    Args:
+        status_code: HTTP status to return.
+        error_code: Protocol ``errorCode`` string
+            (``UNAUTHENTICATED``, ``RESOURCE_DOES_NOT_EXIST``,
+            ``INVALID_PARAMETER_VALUE``, ``PERMISSION_DENIED``,
+            ``UNSUPPORTED_TABLE_FEATURES``, ``NOT_IMPLEMENTED``).
+        message: Human-readable description.
+    """
+
+    def __init__(self, status_code: int, error_code: str, message: str) -> None:  # noqa: D107
+        super().__init__(message)
+        self.status_code = status_code
+        self.error_code = error_code
+        self.message = message

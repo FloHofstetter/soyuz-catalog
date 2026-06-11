@@ -118,6 +118,24 @@ posture and wire shape.
 
 ::: soyuz_catalog.services.metric_view_service
 
+## Sharing service (management)
+
+Over-the-spec extension: Delta Sharing shares, share objects,
+recipients, and grants — the write side of who may read what. See
+[ADR-0015](../../adr/0015-delta-sharing.md) and `DIVERGENCES.md`
+under **Delta Sharing**.
+
+::: soyuz_catalog.services.sharing_service
+
+## Delta Sharing protocol service
+
+The read side recipients hit with bearer tokens: token
+authentication, the derived share/schema/table namespace, Delta
+snapshot reads, and NDJSON action-line assembly per
+[PROTOCOL.md](https://github.com/delta-io/delta-sharing/blob/main/PROTOCOL.md).
+
+::: soyuz_catalog.services.delta_sharing_service
+
 ## Keyset pagination helpers
 
 Shared list-pagination helpers used by every `list_*` service call
@@ -138,3 +156,11 @@ validate `storage_location` / `storage_root` scheme. Lives outside the
 `services/` package because it has no DB or FastAPI dependency.
 
 ::: soyuz_catalog.storage.uri
+
+## Signed file handles
+
+Stateless HMAC pre-signing for the Delta Sharing file-download
+endpoint — the `file://` equivalent of cloud pre-signed URLs. See
+[ADR-0015](../../adr/0015-delta-sharing.md).
+
+::: soyuz_catalog.storage.signed_urls

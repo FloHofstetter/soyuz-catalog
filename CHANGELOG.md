@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Delta Sharing server** (over-the-spec extension, ADR-0015): both
+  halves of the open Delta Sharing story.
+  - *Management* under the UC prefix: CRUD `/shares` and
+    `/recipients`, table membership via
+    `POST`/`DELETE /shares/{name}/objects` (with optional
+    `shared_as` re-homing and per-share placement uniqueness),
+    idempotent `PUT` grants at
+    `/shares/{name}/recipients/{recipient_name}`, and
+    `POST /recipients/{name}/rotate-token`. Recipient bearer tokens
+    are stored as SHA-256 hashes only — the plaintext is returned
+    exactly once on create/rotate and never reaches the audit log.
+  - *Protocol* at `/delta-sharing/` per
+    [PROTOCOL.md](https://github.com/delta-io/delta-sharing/blob/main/PROTOCOL.md):
+    bearer-token-authenticated share/schema/table listings (camelCase
+    pagination), `Delta-Table-Version` header, NDJSON
+    `metadata`/`query` responses with per-file actions, snapshot
+    `version` pinning via `deltalake`, and protocol-envelope errors
+    (`{"errorCode", "message"}`). File bytes are served by soyuz
+    itself through short-lived HMAC-signed URLs
+    (`GET /delta-sharing/files/{file_id}?token=…`, new
+    `SOYUZ_SHARING_SIGNING_KEY` / `SOYUZ_SHARING_FILE_URL_TTL_SECONDS`
+    settings) — the `file://` equivalent of cloud pre-signing.
+    Reader-feature-gated (`minReaderVersion > 1` → 400), CDF and
+    timestamp queries → 501, cloud schemes → 501.
+  - Four new tables (Alembic 018): `shares`, `share_objects`,
+    `recipients`, `share_grants`. Documented in `DIVERGENCES.md`
+    under **Delta Sharing**; conformance-skipped like the other
+    extensions; end-to-end tested against real Delta tables
+    (query → signed download → parquet-byte verification).
 - **Metric views** (over-the-spec extension, ADR-0014): a
   semantic-layer definition store under
   `/api/2.1/unity-catalog/metric-views`. Each metric view bundles

@@ -722,6 +722,175 @@ Deleting the parent schema or catalog requires `force=true` while
 metric views exist underneath, and the force-cascade removes them
 (same gate as tables / volumes / functions / models).
 
+## Delta Sharing — management (over-the-spec)
+
+Over-the-spec extension ([ADR-0015](../adr/0015-delta-sharing.md)).
+Shares are named containers of tables; recipients are bearer-token
+identities; grants make shares visible on the recipient-facing
+[protocol surface](#delta-sharing-protocol-over-the-spec). Like
+every management route, these carry no authentication (proxy-owned,
+ADR-0005). Flagged in [Divergences](../divergences.md) and skipped by
+the conformance subset check.
+
+### `POST /shares`
+
+Create an empty share. Body (`CreateShare`): `name` (required,
+unique), `comment`, `owner`. `409` on duplicate name; `422` on
+unknown fields (objects are added through the dedicated endpoint).
+
+### `GET /shares`
+
+List shares with keyset pagination; `objects` inlined per share.
+See [Pagination](#pagination).
+
+### `GET /shares/{name}`
+
+Fetch by name, objects inlined. `404 NOT_FOUND` if missing.
+
+### `PATCH /shares/{name}`
+
+Replace-style PATCH: `new_name`, `comment`, `owner`. Empty body is a
+no-op; rename collisions are `409`. Grants survive a rename (they
+bind the opaque share id).
+
+### `DELETE /shares/{name}`
+
+Delete the share together with its objects and grants. No `force`
+flag — objects and grants are weak composition, like table columns.
+
+### `POST /shares/{name}/objects`
+
+Place a table inside the share. Body (`AddShareObject`):
+
+| Field             | Type   | Required | Notes                                            |
+|-------------------|--------|----------|--------------------------------------------------|
+| `table_full_name` | string | yes      | Three-part name; must resolve to an existing table (`404` otherwise) |
+| `shared_as`       | string | no       | Two-part `schema.table` alias re-homing the table inside the share |
+
+Returns the share with its post-add object list. `409` when the
+table is already in the share **or** when another object already
+occupies the same effective `schema.table` placement; `400` on a
+malformed name or alias. The binding is by *name*: a renamed or
+dropped table falls out of the share until re-added (see
+[Divergences](../divergences.md)).
+
+### `DELETE /shares/{name}/objects?table_full_name=…`
+
+Remove a table from the share (addressed by the stored full name,
+not the alias). `404` when it is not in the share.
+
+### `PUT /shares/{name}/recipients/{recipient_name}`
+
+Grant the share to a recipient. Idempotent — re-granting is `200`.
+
+### `DELETE /shares/{name}/recipients/{recipient_name}`
+
+Revoke. `404` when no grant exists.
+
+### `POST /recipients`
+
+Create a recipient. Body (`CreateRecipient`): `name` (required,
+unique), `comment`, `owner`. The response carries the **plaintext
+`token` exactly once** — soyuz stores only its SHA-256 hash and can
+never re-serve it. `409` on duplicate name.
+
+### `GET /recipients` / `GET /recipients/{name}`
+
+List (keyset-paginated) and fetch. Neither ever includes the token
+or its hash.
+
+### `PATCH /recipients/{name}`
+
+Replace-style PATCH: `new_name`, `comment`, `owner`. The token is
+not editable here — rotation has its own endpoint.
+
+### `DELETE /recipients/{name}`
+
+Delete the recipient and its grants; its token stops authenticating
+immediately.
+
+### `POST /recipients/{name}/rotate-token`
+
+Mint a fresh token, returned once as `{"token": …}`. The previous
+token is invalid the moment the rotation commits — no grace window.
+
+## Delta Sharing — protocol (over-the-spec)
+
+The recipient-facing read surface, implementing the open
+[Delta Sharing protocol](https://github.com/delta-io/delta-sharing/blob/main/PROTOCOL.md)
+for `file://`-backed Delta tables. Root-mounted under
+`/delta-sharing/` (the path layout is part of the wire contract
+recipients embed in profile files). **Every route except the file
+download requires `Authorization: Bearer <recipient token>`** — the
+one authenticated corner of soyuz, because the token is the
+protocol's own identity mechanism. Errors use the protocol envelope
+`{"errorCode", "message"}`; pagination is camelCase
+(`maxResults` / `pageToken` / `nextPageToken`).
+
+### `GET /delta-sharing/shares`
+
+Shares granted to the calling recipient:
+`{"items": [{"name", "id"}], "nextPageToken"?}`. Ungranted shares
+are invisible and address as `404` — indistinguishable from missing.
+
+### `GET /delta-sharing/shares/{share}`
+
+`{"share": {"name", "id"}}`.
+
+### `GET /delta-sharing/shares/{share}/schemas`
+
+Schemas derived from the share's table placements:
+`{"items": [{"name", "share"}], "nextPageToken"?}`.
+
+### `GET /delta-sharing/shares/{share}/schemas/{schema}/tables`
+
+`{"items": [{"name", "schema", "share", "shareId", "id"}],
+"nextPageToken"?}`. `shared_as` aliases re-home tables here; `404`
+when the schema has no placements.
+
+### `GET /delta-sharing/shares/{share}/all-tables`
+
+Same item shape across every schema of the share.
+
+### `GET .../tables/{table}/version`
+
+Empty `200` body; the version travels in the `Delta-Table-Version`
+response header. `startingTimestamp` is not supported → `501`.
+
+### `GET .../tables/{table}/metadata`
+
+NDJSON (`application/x-ndjson`), two lines plus the
+`Delta-Table-Version` header:
+
+```json
+{"protocol":{"minReaderVersion":1}}
+{"metaData":{"id":"…","format":{"provider":"parquet"},"schemaString":"…","partitionColumns":[…],"configuration":{}}}
+```
+
+### `POST .../tables/{table}/query`
+
+Body (all optional; unknown future fields tolerated):
+`predicateHints`, `jsonPredicateHints`, `limitHint` (accepted and
+ignored — non-binding hints per the protocol), `version` (pins the
+snapshot; unknown version → `400`), `timestamp` /
+`startingVersion` / `endingVersion` (CDF-class features → `501`).
+
+Response: NDJSON protocol + metaData lines, then one
+`{"file": {"url", "id", "partitionValues", "size", "stats"?,
+"expirationTimestamp"}}` line per active parquet file. `stats` is a
+JSON string carrying `numRecords`. Tables whose Delta protocol
+requires `minReaderVersion > 1` → `400 UNSUPPORTED_TABLE_FEATURES`;
+cloud storage schemes → `501`.
+
+### `GET /delta-sharing/files/{file_id}?token=…`
+
+Streams one shared parquet file. The `token` is a short-lived
+HMAC-signed handle minted by the query endpoint (the soyuz
+equivalent of a cloud pre-signed URL) — no bearer token needed, and
+tampered / cross-file / expired handles are all `403`. TTL and
+signing key come from `SOYUZ_SHARING_FILE_URL_TTL_SECONDS` and
+`SOYUZ_SHARING_SIGNING_KEY`.
+
 ## Functions
 
 Per-schema CRUD for SQL and EXTERNAL-language routines. Shape mirrors

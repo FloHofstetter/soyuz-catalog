@@ -160,6 +160,7 @@ nav:
       - 0012 — Table constraints: adr/0012-table-constraints.md
       - 0013 — Connections and foreign catalogs: adr/0013-connections-and-foreign-catalogs.md
       - 0014 — Metric views: adr/0014-metric-views.md
+      - 0015 — Delta Sharing: adr/0015-delta-sharing.md
   - Development:
       - Contributing: development/contributing.md
   - Changelog: changelog.md

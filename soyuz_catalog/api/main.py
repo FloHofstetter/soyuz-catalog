@@ -21,6 +21,7 @@ from soyuz_catalog.api.routes.connections import router as connections_router
 from soyuz_catalog.api.routes.credentials import router as credentials_router
 from soyuz_catalog.api.routes.delta_commits import router as delta_commits_router
 from soyuz_catalog.api.routes.delta_rest import router as delta_rest_router
+from soyuz_catalog.api.routes.delta_sharing import router as delta_sharing_router
 from soyuz_catalog.api.routes.effective_permissions import router as effective_permissions_router
 from soyuz_catalog.api.routes.external_locations import router as external_locations_router
 from soyuz_catalog.api.routes.functions import router as functions_router
@@ -29,8 +30,10 @@ from soyuz_catalog.api.routes.metastore import router as metastore_router
 from soyuz_catalog.api.routes.metric_views import router as metric_views_router
 from soyuz_catalog.api.routes.model_versions import router as model_versions_router
 from soyuz_catalog.api.routes.permissions import router as permissions_router
+from soyuz_catalog.api.routes.recipients import router as recipients_router
 from soyuz_catalog.api.routes.registered_models import router as registered_models_router
 from soyuz_catalog.api.routes.schemas import router as schemas_router
+from soyuz_catalog.api.routes.shares import router as shares_router
 from soyuz_catalog.api.routes.staging_tables import router as staging_tables_router
 from soyuz_catalog.api.routes.tables import router as tables_router
 from soyuz_catalog.api.routes.tags import router as tags_router
@@ -38,7 +41,7 @@ from soyuz_catalog.api.routes.temporary_credentials import router as temporary_c
 from soyuz_catalog.api.routes.volume_files import router as volume_files_router
 from soyuz_catalog.api.routes.volumes import router as volumes_router
 from soyuz_catalog.db import init_db, run_migrations
-from soyuz_catalog.exceptions import SoyuzError
+from soyuz_catalog.exceptions import SharingProtocolError, SoyuzError
 from soyuz_catalog.logging_config import configure_logging
 from soyuz_catalog.settings import get_settings
 
@@ -73,9 +76,9 @@ soyuz-catalog implements the upstream UC spec
 (`api/all.yaml`) plus a small set of over-the-spec extensions
 ([OpenLineage ingest][adr-08], [tags][adr-10],
 [table constraints][adr-12], [Lakehouse Federation][adr-13],
-[metric views][adr-14], effective-permissions traversal, audit-log
-read) and a secondary [Delta REST Catalog][adr-09] surface against
-the same storage.
+[metric views][adr-14], [Delta Sharing][adr-15],
+effective-permissions traversal, audit-log read) and a secondary
+[Delta REST Catalog][adr-09] surface against the same storage.
 
 - **Spec source of truth:** `unitycatalog/api/all.yaml` ([ADR-0002][adr-02]).
 - **Stack:** FastAPI + SQLAlchemy 2.0 (sync) + Pydantic v2 + Alembic.
@@ -90,6 +93,7 @@ the same storage.
 [adr-12]: https://github.com/FloHofstetter/soyuz-catalog/blob/main/docs/adr/0012-table-constraints.md
 [adr-13]: https://github.com/FloHofstetter/soyuz-catalog/blob/main/docs/adr/0013-connections-and-foreign-catalogs.md
 [adr-14]: https://github.com/FloHofstetter/soyuz-catalog/blob/main/docs/adr/0014-metric-views.md
+[adr-15]: https://github.com/FloHofstetter/soyuz-catalog/blob/main/docs/adr/0015-delta-sharing.md
 """
 
 
@@ -118,6 +122,18 @@ _OPENAPI_TAGS: list[dict[str, str]] = [
     {
         "name": "metric-views",
         "description": "Semantic-layer metric view definitions (extension; ADR-0014).",
+    },
+    {
+        "name": "shares",
+        "description": "Delta Sharing shares: objects + recipient grants (extension; ADR-0015).",
+    },
+    {
+        "name": "recipients",
+        "description": "Delta Sharing bearer-token recipients (extension; ADR-0015).",
+    },
+    {
+        "name": "delta-sharing",
+        "description": "Open Delta Sharing protocol surface for recipients (ADR-0015).",
     },
     {
         "name": "tags",
@@ -212,6 +228,19 @@ def create_app() -> FastAPI:
     async def _soyuz_error_handler(_request: Request, exc: SoyuzError) -> JSONResponse:
         return envelope(exc.status_code, exc.error_code, exc.message)
 
+    @app.exception_handler(SharingProtocolError)
+    async def _sharing_protocol_error_handler(
+        _request: Request,
+        exc: SharingProtocolError,
+    ) -> JSONResponse:
+        # The open Delta Sharing protocol pins its own error envelope
+        # ({"errorCode", "message"}), which is why this handler does
+        # not reuse the soyuz envelope() builder — see ADR-0015.
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"errorCode": exc.error_code, "message": exc.message},
+        )
+
     @app.exception_handler(RequestValidationError)
     async def _validation_handler(_request: Request, exc: RequestValidationError) -> JSONResponse:
         errors: list[dict[str, Any]] = [dict(e) for e in exc.errors()]
@@ -245,6 +274,12 @@ def create_app() -> FastAPI:
     # keeping the CRUD next to the other three-part resources
     # minimises URL surprises.
     app.include_router(metric_views_router, prefix=settings.api_prefix)
+    # Delta Sharing management (ADR-0015) — shares / recipients /
+    # grants. Over-the-spec, mounted under the UC prefix like
+    # connections because Databricks ships the same resources as UC
+    # securables there; the conformance test skips both prefixes.
+    app.include_router(shares_router, prefix=settings.api_prefix)
+    app.include_router(recipients_router, prefix=settings.api_prefix)
     app.include_router(functions_router, prefix=settings.api_prefix)
     app.include_router(registered_models_router, prefix=settings.api_prefix)
     app.include_router(model_versions_router, prefix=settings.api_prefix)
@@ -273,6 +308,12 @@ def create_app() -> FastAPI:
     # root, like lineage / tags, because it lives outside the UC spec
     # and the spec-conformance test skips that prefix explicitly.
     app.include_router(audit_router)
+    # Delta Sharing protocol surface (ADR-0015) — recipient-facing,
+    # bearer-token authenticated, mounted at the root like lineage
+    # because the path layout is part of an external wire contract
+    # (recipients put the base URL in their profile file). The
+    # spec-conformance test skips this prefix explicitly.
+    app.include_router(delta_sharing_router)
     return app
 
 

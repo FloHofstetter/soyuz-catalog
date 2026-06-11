@@ -118,6 +118,12 @@ from soyuz_catalog_client.api.permissions.get_permissions_api_2_1_unity_catalog_
 from soyuz_catalog_client.api.permissions.update_permissions_api_2_1_unity_catalog_permissions_securable_type_full_name_patch import (  # noqa: E402,E501
     UpdatePermissionsApi21UnityCatalogPermissionsSecurableTypeFullNamePatchSecurableType as _UpdateSecurableType,  # noqa: E501
 )
+from soyuz_catalog_client.api.recipients import (  # noqa: E402
+    create_recipient_api_2_1_unity_catalog_recipients_post as _create_recipient,
+)
+from soyuz_catalog_client.api.recipients import (
+    rotate_recipient_token_api_2_1_unity_catalog_recipients_name_rotate_token_post as _rotate_recipient_token,  # noqa: E501
+)
 from soyuz_catalog_client.api.registered_models import (  # noqa: E402
     create_registered_model_api_2_1_unity_catalog_models_post as _create_registered_model,
 )
@@ -127,6 +133,18 @@ from soyuz_catalog_client.api.registered_models import (
 from soyuz_catalog_client.api.schemas import (  # noqa: E402
     create_schema_api_2_1_unity_catalog_schemas_post as _create_schema,
 )
+from soyuz_catalog_client.api.shares import (  # noqa: E402
+    add_share_object_api_2_1_unity_catalog_shares_name_objects_post as _add_share_object,
+)
+from soyuz_catalog_client.api.shares import (
+    create_share_api_2_1_unity_catalog_shares_post as _create_share,
+)
+from soyuz_catalog_client.api.shares import (
+    get_share_api_2_1_unity_catalog_shares_name_get as _get_share,
+)
+from soyuz_catalog_client.api.shares import (
+    grant_share_api_2_1_unity_catalog_shares_name_recipients_recipient_name_put as _grant_share,
+)
 from soyuz_catalog_client.api.tables import (  # noqa: E402
     create_staging_table_api_2_1_unity_catalog_staging_tables_post as _create_staging_table,
 )
@@ -134,6 +152,7 @@ from soyuz_catalog_client.api.temporary_credentials import (  # noqa: E402
     generate_temporary_path_credentials_api_2_1_unity_catalog_temporary_path_credentials_post as _generate_path_credentials,
 )
 from soyuz_catalog_client.models import (  # noqa: E402
+    AddShareObject,
     AwsIamRoleRequest,
     ConnectionInfo,
     CreateCatalog,
@@ -148,8 +167,10 @@ from soyuz_catalog_client.models import (  # noqa: E402
     CreateFunctionSqlDataAccess,
     CreateMetricView,
     CreateModelVersion,
+    CreateRecipient,
     CreateRegisteredModel,
     CreateSchema,
+    CreateShare,
     CreateStagingTable,
     CredentialInfo,
     ExternalLocationInfo,
@@ -169,7 +190,10 @@ from soyuz_catalog_client.models import (  # noqa: E402
     PermissionsChange,
     PermissionsChangeAddItem,
     PermissionsList,
+    RecipientInfo,
     RegisteredModelInfo,
+    RotateRecipientTokenResponse,
+    ShareInfo,
     StagingTableInfo,
     TemporaryCredentials,
     UpdateCredentialRequest,
@@ -605,7 +629,7 @@ def test_generated_client_metric_view_crud(live_server: str) -> None:
     )
     assert isinstance(created, MetricViewInfo)
     assert created.full_name == full_name
-    assert created.spec is not None
+    assert isinstance(created.spec, MetricViewSpec)
     assert [m.name for m in created.spec.measures] == ["revenue"]
 
     fetched = _get_metric_view.sync(client=client, full_name=full_name)
@@ -627,3 +651,83 @@ def test_generated_client_metric_view_crud(live_server: str) -> None:
     _delete_metric_view.sync(client=client, full_name=full_name)
     with pytest.raises(Exception):
         _get_metric_view.sync(client=client, full_name=full_name)
+
+
+# ---------------------------------------------------------------------------
+# Delta Sharing management (over-the-spec extension, ADR-0015)
+# ---------------------------------------------------------------------------
+
+
+def test_generated_client_sharing_management_roundtrip(live_server: str) -> None:
+    client = make_generated_client(live_server)
+    catalog, schema = _make_parent(client)
+    table_name = f"t_{_suffix()}"
+    share_name = f"share_{_suffix()}"
+    recipient_name = f"rcpt_{_suffix()}"
+    # The shared table only needs to *exist* for membership management;
+    # protocol reads (which would need a real Delta log) are covered by
+    # tests/test_sharing_protocol.py.
+    import httpx
+
+    table_body = {
+        "name": table_name,
+        "catalog_name": catalog,
+        "schema_name": schema,
+        "table_type": "EXTERNAL",
+        "data_source_format": "DELTA",
+        "storage_location": f"file:///tmp/{table_name}",
+        "columns": [
+            {"name": "id", "type_name": "LONG", "type_text": "bigint", "type_json": "{}"},
+        ],
+    }
+    assert (
+        httpx.post(f"{live_server}/api/2.1/unity-catalog/tables", json=table_body).status_code
+        == 200
+    )
+
+    share = _create_share.sync(client=client, body=CreateShare(name=share_name))
+    assert isinstance(share, ShareInfo)
+    assert share.name == share_name
+
+    updated = _add_share_object.sync(
+        client=client,
+        name=share_name,
+        body=AddShareObject(
+            table_full_name=f"{catalog}.{schema}.{table_name}",
+            shared_as="public.t1",
+        ),
+    )
+    assert isinstance(updated, ShareInfo)
+    assert isinstance(updated.objects, list)
+    assert len(updated.objects) == 1
+    assert updated.objects[0].shared_as == "public.t1"
+
+    recipient = _create_recipient.sync(client=client, body=CreateRecipient(name=recipient_name))
+    assert isinstance(recipient, RecipientInfo)
+    assert isinstance(recipient.token, str) and recipient.token
+
+    _grant_share.sync(client=client, name=share_name, recipient_name=recipient_name)
+
+    fetched = _get_share.sync(client=client, name=share_name)
+    assert isinstance(fetched, ShareInfo)
+    assert fetched.id == share.id
+
+    rotated = _rotate_recipient_token.sync(client=client, name=recipient_name)
+    assert isinstance(rotated, RotateRecipientTokenResponse)
+    assert rotated.token and rotated.token != recipient.token
+
+    # The rotated token authenticates on the protocol surface; the
+    # original is dead.
+    r = httpx.get(
+        f"{live_server}/delta-sharing/shares",
+        headers={"Authorization": f"Bearer {rotated.token}"},
+    )
+    assert r.status_code == 200
+    assert [s["name"] for s in r.json()["items"]] == [share_name]
+    assert (
+        httpx.get(
+            f"{live_server}/delta-sharing/shares",
+            headers={"Authorization": f"Bearer {recipient.token}"},
+        ).status_code
+        == 401
+    )

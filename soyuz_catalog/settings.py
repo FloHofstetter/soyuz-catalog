@@ -52,6 +52,23 @@ class Settings(BaseSettings):
             (stable regardless of launch CWD); deployments using
             persistent storage should override via
             ``SOYUZ_MODEL_ARTIFACT_ROOT``.
+        sharing_signing_key: Secret used to HMAC-sign the short-lived
+            file-download handles the Delta Sharing protocol surface
+            embeds in its ``file.url`` lines. Empty (the default)
+            means a random per-process key is generated at first use —
+            fine for a single-process deployment, where the only cost
+            is that in-flight handles die on restart. Multi-replica
+            deployments behind one load balancer must set the same
+            value on every replica via ``SOYUZ_SHARING_SIGNING_KEY``
+            or handles signed by one replica will be rejected by the
+            others.
+        sharing_file_url_ttl_seconds: Lifetime of those signed file
+            handles, in seconds. The protocol's
+            ``expirationTimestamp`` on every file action is derived
+            from this, so well-behaved clients re-query before expiry.
+            Default 900 (15 minutes) — long enough for a bulk parquet
+            download, short enough that a leaked URL goes stale
+            quickly.
     """
 
     model_config = SettingsConfigDict(env_prefix="SOYUZ_", env_file=None, extra="ignore")
@@ -67,6 +84,8 @@ class Settings(BaseSettings):
     # Same anchor for the artifact root so MLflow uploads land next
     # to ``soyuz.db`` regardless of CWD.
     model_artifact_root: str = str(_PROJECT_ROOT / "model_artifacts")
+    sharing_signing_key: str = ""
+    sharing_file_url_ttl_seconds: int = 900
 
 
 @lru_cache(maxsize=1)

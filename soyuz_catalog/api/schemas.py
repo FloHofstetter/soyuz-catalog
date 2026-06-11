@@ -2035,3 +2035,177 @@ class ListMetricViewsResponse(BaseModel):
 
     metric_views: list[MetricViewInfo]
     next_page_token: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Delta Sharing management surface — over-the-spec extension (ADR-0015)
+# ---------------------------------------------------------------------------
+
+
+class ShareObjectInfo(BaseModel):
+    """One table placed inside a share, as returned on ``ShareInfo``.
+
+    ``added_at`` is the wire name for the row's creation timestamp —
+    a share object is immutable after creation (remove + re-add is
+    the only edit), so there is no ``updated_at``.
+    """
+
+    table_full_name: str
+    shared_as: str | None = None
+    added_at: int | None = None
+
+
+class ShareInfo(BaseModel):
+    """Response shape for a share on the management surface.
+
+    Over-the-spec addition (ADR-0015): upstream UC OSS ``all.yaml``
+    defines no sharing surface, so this shape is soyuz' contract.
+    ``objects`` is always inlined — shares are small by construction
+    (each entry is one table reference) and a separate list endpoint
+    would buy nothing but a second round-trip.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str | None = None
+    id: str | None = None
+    comment: str | None = None
+    owner: str | None = None
+    objects: list[ShareObjectInfo] | None = None
+    created_at: int | None = None
+    created_by: str | None = None
+    updated_at: int | None = None
+    updated_by: str | None = None
+
+
+class CreateShare(BaseModel):
+    """Request body for ``POST /shares``.
+
+    ``extra="forbid"`` rejects unknown fields (including ``id``,
+    ``objects``, …) with 422 — tables enter a share through the
+    dedicated ``POST /shares/{name}/objects`` endpoint, never inline
+    on create.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1)
+    comment: str | None = None
+    owner: str | None = None
+
+
+class UpdateShare(BaseModel):
+    """Request body for ``PATCH /shares/{name}``.
+
+    Replace-style PATCH driven by ``model_fields_set``. Objects are
+    not editable here — add/remove go through the dedicated object
+    endpoints so every membership change is one auditable operation.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    new_name: str | None = None
+    comment: str | None = None
+    owner: str | None = None
+
+
+class ListSharesResponse(BaseModel):
+    """Response shape for ``GET /shares``.
+
+    Keyset pagination via ``next_page_token``; same shape as every
+    other list response in this module.
+    """
+
+    shares: list[ShareInfo]
+    next_page_token: str | None = None
+
+
+class AddShareObject(BaseModel):
+    """Request body for ``POST /shares/{name}/objects``.
+
+    ``table_full_name`` must resolve to an existing table at add time
+    (404 otherwise). ``shared_as`` optionally re-homes the table
+    inside the share's namespace as a two-part ``schema.table`` alias;
+    when absent the protocol placement derives from the table's own
+    schema and table name segments.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    table_full_name: str = Field(min_length=1)
+    shared_as: str | None = None
+
+
+class RecipientInfo(BaseModel):
+    """Response shape for a recipient on the management surface.
+
+    ``token`` carries the **plaintext** bearer token and is populated
+    exactly once — in the create response and in each rotate-token
+    response. Every other read returns ``None`` (and the field is
+    dropped by ``response_model_exclude_none``): soyuz stores only
+    the SHA-256 hash, so it *cannot* re-serve a lost token. The
+    token-hash itself is never exposed on any wire shape.
+    """
+
+    name: str | None = None
+    id: str | None = None
+    comment: str | None = None
+    owner: str | None = None
+    token: str | None = None
+    created_at: int | None = None
+    created_by: str | None = None
+    updated_at: int | None = None
+    updated_by: str | None = None
+
+
+class CreateRecipient(BaseModel):
+    """Request body for ``POST /recipients``.
+
+    The bearer token is always server-generated — there is no field
+    to supply one, so token entropy is never caller-controlled.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1)
+    comment: str | None = None
+    owner: str | None = None
+
+
+class UpdateRecipient(BaseModel):
+    """Request body for ``PATCH /recipients/{name}``.
+
+    Replace-style PATCH driven by ``model_fields_set``. The bearer
+    token is not editable here — rotation has its own endpoint
+    (``POST /recipients/{name}/rotate-token``) because it is a
+    credential event worth a dedicated audit entry, not a metadata
+    edit.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    new_name: str | None = None
+    comment: str | None = None
+    owner: str | None = None
+
+
+class ListRecipientsResponse(BaseModel):
+    """Response shape for ``GET /recipients``.
+
+    Keyset pagination via ``next_page_token``; same shape as every
+    other list response in this module.
+    """
+
+    recipients: list[RecipientInfo]
+    next_page_token: str | None = None
+
+
+class RotateRecipientTokenResponse(BaseModel):
+    """Response shape for ``POST /recipients/{name}/rotate-token``.
+
+    Carries the fresh plaintext token — the only time it is ever
+    visible. The previous token stops authenticating the moment the
+    rotation commits; there is no grace window in the MVP.
+    """
+
+    token: str

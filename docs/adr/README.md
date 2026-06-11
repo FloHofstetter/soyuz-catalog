@@ -87,6 +87,10 @@ clients expect them.
 - [ADR-0014 — Metric views](0014-metric-views.md). Semantic-layer
   dimension/measure definitions stored and validated by soyuz,
   compiled and executed by the consumer.
+- [ADR-0015 — Delta Sharing](0015-delta-sharing.md). Shares,
+  bearer-token recipients, and the open Delta Sharing protocol
+  surface (NDJSON reads + self-served pre-signed file URLs) for
+  file://-backed tables.
 
 ## Operational
 
@@ -125,3 +129,4 @@ context.
 | [0012](0012-table-constraints.md) | Table constraints | Accepted |
 | [0013](0013-connections-and-foreign-catalogs.md) | Connections and foreign catalogs | Accepted |
 | [0014](0014-metric-views.md) | Metric views | Accepted |
+| [0015](0015-delta-sharing.md) | Delta Sharing | Accepted |

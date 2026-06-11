@@ -3,6 +3,7 @@
 from .add_commit_update import AddCommitUpdate
 from .add_commit_update_uniform_type_0 import AddCommitUpdateUniformType0
 from .add_constraint_update import AddConstraintUpdate
+from .add_share_object import AddShareObject
 from .assert_etag import AssertEtag
 from .assert_table_uuid import AssertTableUUID
 from .aws_credentials import AwsCredentials
@@ -42,9 +43,11 @@ from .create_function_routine_dependencies_type_0 import (
 from .create_function_sql_data_access import CreateFunctionSqlDataAccess
 from .create_metric_view import CreateMetricView
 from .create_model_version import CreateModelVersion
+from .create_recipient import CreateRecipient
 from .create_registered_model import CreateRegisteredModel
 from .create_schema import CreateSchema
 from .create_schema_properties_type_0 import CreateSchemaPropertiesType0
+from .create_share import CreateShare
 from .create_staging_table import CreateStagingTable
 from .create_staging_table_request import CreateStagingTableRequest
 from .create_table import CreateTable
@@ -110,6 +113,7 @@ from .get_metastore_summary_response import GetMetastoreSummaryResponse
 from .get_permissions_api_21_unity_catalog_permissions_securable_type_full_name_get_securable_type import (
     GetPermissionsApi21UnityCatalogPermissionsSecurableTypeFullNameGetSecurableType,
 )
+from .get_protocol_share_response import GetProtocolShareResponse
 from .get_tags_tags_securable_type_full_name_get_securable_type import (
     GetTagsTagsSecurableTypeFullNameGetSecurableType,
 )
@@ -129,8 +133,13 @@ from .list_external_locations_response import ListExternalLocationsResponse
 from .list_functions_response import ListFunctionsResponse
 from .list_metric_views_response import ListMetricViewsResponse
 from .list_model_versions_response import ListModelVersionsResponse
+from .list_protocol_schemas_response import ListProtocolSchemasResponse
+from .list_protocol_shares_response import ListProtocolSharesResponse
+from .list_protocol_tables_response import ListProtocolTablesResponse
+from .list_recipients_response import ListRecipientsResponse
 from .list_registered_models_response import ListRegisteredModelsResponse
 from .list_schemas_response import ListSchemasResponse
+from .list_shares_response import ListSharesResponse
 from .list_tables_response import ListTablesResponse
 from .list_volumes_response import ListVolumesResponse
 from .metadata import Metadata
@@ -155,6 +164,11 @@ from .permissions_list import PermissionsList
 from .primary_key_constraint import PrimaryKeyConstraint
 from .privilege_assignment import PrivilegeAssignment
 from .privilege_assignment_privileges_item import PrivilegeAssignmentPrivilegesItem
+from .protocol_schema import ProtocolSchema
+from .protocol_share import ProtocolShare
+from .protocol_table import ProtocolTable
+from .query_table_request import QueryTableRequest
+from .recipient_info import RecipientInfo
 from .registered_model_info import RegisteredModelInfo
 from .remove_domain_metadata_update import RemoveDomainMetadataUpdate
 from .remove_properties_update import RemovePropertiesUpdate
@@ -188,11 +202,17 @@ from .response_delete_metric_view_api_21_unity_catalog_metric_views_full_name_de
 from .response_delete_model_version_api_21_unity_catalog_models_full_name_versions_version_delete import (
     ResponseDeleteModelVersionApi21UnityCatalogModelsFullNameVersionsVersionDelete,
 )
+from .response_delete_recipient_api_21_unity_catalog_recipients_name_delete import (
+    ResponseDeleteRecipientApi21UnityCatalogRecipientsNameDelete,
+)
 from .response_delete_registered_model_api_21_unity_catalog_models_full_name_delete import (
     ResponseDeleteRegisteredModelApi21UnityCatalogModelsFullNameDelete,
 )
 from .response_delete_schema_api_21_unity_catalog_schemas_full_name_delete import (
     ResponseDeleteSchemaApi21UnityCatalogSchemasFullNameDelete,
+)
+from .response_delete_share_api_21_unity_catalog_shares_name_delete import (
+    ResponseDeleteShareApi21UnityCatalogSharesNameDelete,
 )
 from .response_delete_table_api_21_unity_catalog_tables_full_name_delete import (
     ResponseDeleteTableApi21UnityCatalogTablesFullNameDelete,
@@ -203,10 +223,17 @@ from .response_delete_volume_api_21_unity_catalog_volumes_full_name_delete impor
 from .response_delete_volume_file_api_21_unity_catalog_volumes_full_name_files_path_delete import (
     ResponseDeleteVolumeFileApi21UnityCatalogVolumesFullNameFilesPathDelete,
 )
+from .response_grant_share_api_21_unity_catalog_shares_name_recipients_recipient_name_put import (
+    ResponseGrantShareApi21UnityCatalogSharesNameRecipientsRecipientNamePut,
+)
 from .response_healthz_healthz_get import ResponseHealthzHealthzGet
+from .response_revoke_share_api_21_unity_catalog_shares_name_recipients_recipient_name_delete import (
+    ResponseRevokeShareApi21UnityCatalogSharesNameRecipientsRecipientNameDelete,
+)
 from .response_upload_volume_file_api_21_unity_catalog_volumes_full_name_files_post import (
     ResponseUploadVolumeFileApi21UnityCatalogVolumesFullNameFilesPost,
 )
+from .rotate_recipient_token_response import RotateRecipientTokenResponse
 from .schema_info import SchemaInfo
 from .schema_info_properties_type_0 import SchemaInfoPropertiesType0
 from .set_domain_metadata_update import SetDomainMetadataUpdate
@@ -216,6 +243,8 @@ from .set_properties_update import SetPropertiesUpdate
 from .set_protocol_update import SetProtocolUpdate
 from .set_schema_update import SetSchemaUpdate
 from .set_table_comment_update import SetTableCommentUpdate
+from .share_info import ShareInfo
+from .share_object_info import ShareObjectInfo
 from .staging_table_info import StagingTableInfo
 from .staging_table_response import StagingTableResponse
 from .storage_credential import StorageCredential
@@ -246,9 +275,11 @@ from .update_permissions import UpdatePermissions
 from .update_permissions_api_21_unity_catalog_permissions_securable_type_full_name_patch_securable_type import (
     UpdatePermissionsApi21UnityCatalogPermissionsSecurableTypeFullNamePatchSecurableType,
 )
+from .update_recipient import UpdateRecipient
 from .update_registered_model import UpdateRegisteredModel
 from .update_schema import UpdateSchema
 from .update_schema_properties_type_0 import UpdateSchemaPropertiesType0
+from .update_share import UpdateShare
 from .update_snapshot_version_update import UpdateSnapshotVersionUpdate
 from .update_table_request import UpdateTableRequest
 from .update_tags import UpdateTags
@@ -264,6 +295,7 @@ __all__ = (
     "AddCommitUpdate",
     "AddCommitUpdateUniformType0",
     "AddConstraintUpdate",
+    "AddShareObject",
     "AssertEtag",
     "AssertTableUUID",
     "AwsCredentials",
@@ -299,9 +331,11 @@ __all__ = (
     "CreateFunctionSqlDataAccess",
     "CreateMetricView",
     "CreateModelVersion",
+    "CreateRecipient",
     "CreateRegisteredModel",
     "CreateSchema",
     "CreateSchemaPropertiesType0",
+    "CreateShare",
     "CreateStagingTable",
     "CreateStagingTableRequest",
     "CreateTable",
@@ -349,6 +383,7 @@ __all__ = (
     "GetEffectivePermissionsApi21UnityCatalogEffectivePermissionsSecurableTypeFullNameGetSecurableType",
     "GetMetastoreSummaryResponse",
     "GetPermissionsApi21UnityCatalogPermissionsSecurableTypeFullNameGetSecurableType",
+    "GetProtocolShareResponse",
     "GetTagsTagsSecurableTypeFullNameGetSecurableType",
     "HTTPValidationError",
     "LineageEdgeOut",
@@ -364,8 +399,13 @@ __all__ = (
     "ListFunctionsResponse",
     "ListMetricViewsResponse",
     "ListModelVersionsResponse",
+    "ListProtocolSchemasResponse",
+    "ListProtocolSharesResponse",
+    "ListProtocolTablesResponse",
+    "ListRecipientsResponse",
     "ListRegisteredModelsResponse",
     "ListSchemasResponse",
+    "ListSharesResponse",
     "ListTablesResponse",
     "ListVolumesResponse",
     "Metadata",
@@ -390,6 +430,11 @@ __all__ = (
     "PrimaryKeyConstraint",
     "PrivilegeAssignment",
     "PrivilegeAssignmentPrivilegesItem",
+    "ProtocolSchema",
+    "ProtocolShare",
+    "ProtocolTable",
+    "QueryTableRequest",
+    "RecipientInfo",
     "RegisteredModelInfo",
     "RemoveDomainMetadataUpdate",
     "RemovePropertiesUpdate",
@@ -405,13 +450,18 @@ __all__ = (
     "ResponseDeleteFunctionApi21UnityCatalogFunctionsFullNameDelete",
     "ResponseDeleteMetricViewApi21UnityCatalogMetricViewsFullNameDelete",
     "ResponseDeleteModelVersionApi21UnityCatalogModelsFullNameVersionsVersionDelete",
+    "ResponseDeleteRecipientApi21UnityCatalogRecipientsNameDelete",
     "ResponseDeleteRegisteredModelApi21UnityCatalogModelsFullNameDelete",
     "ResponseDeleteSchemaApi21UnityCatalogSchemasFullNameDelete",
+    "ResponseDeleteShareApi21UnityCatalogSharesNameDelete",
     "ResponseDeleteTableApi21UnityCatalogTablesFullNameDelete",
     "ResponseDeleteVolumeApi21UnityCatalogVolumesFullNameDelete",
     "ResponseDeleteVolumeFileApi21UnityCatalogVolumesFullNameFilesPathDelete",
+    "ResponseGrantShareApi21UnityCatalogSharesNameRecipientsRecipientNamePut",
     "ResponseHealthzHealthzGet",
+    "ResponseRevokeShareApi21UnityCatalogSharesNameRecipientsRecipientNameDelete",
     "ResponseUploadVolumeFileApi21UnityCatalogVolumesFullNameFilesPost",
+    "RotateRecipientTokenResponse",
     "SchemaInfo",
     "SchemaInfoPropertiesType0",
     "SetDomainMetadataUpdate",
@@ -421,6 +471,8 @@ __all__ = (
     "SetProtocolUpdate",
     "SetSchemaUpdate",
     "SetTableCommentUpdate",
+    "ShareInfo",
+    "ShareObjectInfo",
     "StagingTableInfo",
     "StagingTableResponse",
     "StorageCredential",
@@ -447,10 +499,12 @@ __all__ = (
     "UpdateModelVersion",
     "UpdatePermissions",
     "UpdatePermissionsApi21UnityCatalogPermissionsSecurableTypeFullNamePatchSecurableType",
+    "UpdateRecipient",
     "UpdateRegisteredModel",
     "Updates",
     "UpdateSchema",
     "UpdateSchemaPropertiesType0",
+    "UpdateShare",
     "UpdateSnapshotVersionUpdate",
     "UpdateTableRequest",
     "UpdateTags",
