@@ -69,6 +69,21 @@ class Settings(BaseSettings):
             Default 900 (15 minutes) — long enough for a bulk parquet
             download, short enough that a leaked URL goes stale
             quickly.
+        enable_sts_vending: Opt-in switch for real AWS STS credential
+            vending on the temporary-credentials endpoints. Default
+            ``False`` keeps soyuz metadata-only: S3 tables get an empty
+            ``aws_temp_credentials`` stub. When ``True`` and the target
+            path resolves to an external location bound to a credential
+            with an ``aws_iam_role_arn``, soyuz assumes that role via
+            STS and returns the short-lived keys. Off by default
+            because it pulls in real AWS calls plus per-deployment IAM
+            setup; see ``DIVERGENCES.md``.
+        sts_region: AWS region for the STS client used by credential
+            vending. Empty (the default) lets boto3 resolve the region
+            from its own environment / instance metadata.
+        sts_credential_duration_seconds: Requested lifetime of the
+            assumed-role session, in seconds. Default 3600 (one hour);
+            AWS clamps it to the role's ``MaxSessionDuration``.
     """
 
     model_config = SettingsConfigDict(env_prefix="SOYUZ_", env_file=None, extra="ignore")
@@ -86,6 +101,9 @@ class Settings(BaseSettings):
     model_artifact_root: str = str(_PROJECT_ROOT / "model_artifacts")
     sharing_signing_key: str = ""
     sharing_file_url_ttl_seconds: int = 900
+    enable_sts_vending: bool = False
+    sts_region: str = ""
+    sts_credential_duration_seconds: int = 3600
 
 
 @lru_cache(maxsize=1)

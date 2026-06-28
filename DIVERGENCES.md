@@ -396,6 +396,22 @@ section below.
 This is a behavioural *stub*, not an intentional divergence — it is
 listed here so future readers can find the rationale in one place.
 
+### Opt-in real S3 STS vending
+
+The S3 stub is now overridable. When `SOYUZ_ENABLE_STS_VENDING` is set
+*and* the target path resolves to a registered external location whose
+credential carries an `aws_iam_role_arn`, soyuz assumes that role via
+STS (`boto3`, installed through the `vending` extra) and returns the
+short-lived `access_key_id` / `secret_access_key` / `session_token` in
+`aws_temp_credentials`. The longest-prefix external location wins; a
+path no location governs, a credential with no role, or any STS error
+all fall back to the empty stub, so the metadata-only behaviour is the
+default and a vending hiccup degrades gracefully rather than failing a
+read. Azure user-delegation SAS and GCP OAuth vending stay out of
+scope — those nested objects remain empty regardless of the flag.
+Configure the STS client with `SOYUZ_STS_REGION` and
+`SOYUZ_STS_CREDENTIAL_DURATION_SECONDS`. Tests: `tests/test_sts_vending.py`.
+
 Regression tests:
 `tests/test_temporary_credentials.py::test_table_credentials_file_scheme_returns_expiration_only`,
 `tests/test_temporary_credentials.py::test_table_credentials_routes_per_storage_scheme`,

@@ -96,6 +96,41 @@ def get_external_location(session: Session, name: str) -> ExternalLocation:
     return location
 
 
+def resolve_external_location_for_path(
+    session: Session,
+    storage_url: str,
+) -> ExternalLocation | None:
+    """Find the external location whose URL is the longest prefix of a path.
+
+    Credential vending needs to map a concrete storage path (a table's
+    ``storage_location``, e.g. ``s3://bucket/cat/schema/tbl``) back to
+    the registered :class:`ExternalLocation` that governs it, so the
+    bound credential's IAM role can be assumed. The match is on a path
+    boundary — ``s3://bucket`` matches ``s3://bucket/x`` but not
+    ``s3://bucket2/x`` — and the longest matching prefix wins so a more
+    specific location overrides a broader one.
+
+    The candidate set is expected to be small (one row per registered
+    storage root), so a full scan + in-memory prefix match is fine; a
+    keyset query is not warranted.
+
+    Args:
+        session: Active SQLAlchemy session.
+        storage_url: The concrete storage path to resolve.
+
+    Returns:
+        ExternalLocation | None: The governing external location, or
+            ``None`` when no registered URL is a prefix of the path.
+    """
+    best: ExternalLocation | None = None
+    best_len = -1
+    for location in session.scalars(select(ExternalLocation)).all():
+        base = location.url.rstrip("/")
+        if (storage_url == base or storage_url.startswith(base + "/")) and len(base) > best_len:
+            best, best_len = location, len(base)
+    return best
+
+
 def list_external_locations(
     session: Session,
     max_results: int | None = None,
