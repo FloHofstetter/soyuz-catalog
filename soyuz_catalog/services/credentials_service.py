@@ -1,17 +1,20 @@
 """Business logic for the TemporaryCredentials resource.
 
-These endpoints ship as **spec-conformant stubs**: the response shape
-matches the UC OpenAPI ``TemporaryCredentials`` schema exactly, but no
-**real** credential values are ever populated. The response reflects
-*which* cloud path the server would route a future real credential
-through — ``s3``/``s3a`` attach an empty ``AwsCredentials``,
-``abfss`` an empty ``AzureUserDelegationSAS``, ``gs`` an empty
-``GcpOauthToken``, and ``file`` / legacy / unparseable locations stay
-``expiration_time``-only. The nested object is always empty because
-real STS / SAS / OAuth vending is explicitly out of scope (metadata-
-only, see README design principle 3) and would pull in boto3 /
-azure-identity / google-auth plus per-deployment IAM configuration.
-See ``DIVERGENCES.md`` for the full rationale.
+These endpoints default to **spec-conformant stubs**: the response shape
+matches the UC OpenAPI ``TemporaryCredentials`` schema exactly, and by
+default no **real** credential values are populated. The response
+reflects *which* cloud path the server would route a real credential
+through — ``s3``/``s3a`` attach an ``AwsCredentials``, ``abfss`` an
+empty ``AzureUserDelegationSAS``, ``gs`` an empty ``GcpOauthToken``, and
+``file`` / legacy / unparseable locations stay ``expiration_time``-only.
+
+**Opt-in real S3 vending.** When ``SOYUZ_ENABLE_STS_VENDING`` is set and
+the target path resolves to a registered external location bound to a
+credential with an ``aws_iam_role_arn``, soyuz assumes that role via STS
+and returns the short-lived keys (see :func:`_mint_aws_credentials`).
+Off by default — the metadata-only stance stays the default and Azure /
+GCS vending remains out of scope. See ``DIVERGENCES.md`` for the
+rationale.
 
 The service still performs the two checks that matter for client
 behaviour:
@@ -44,11 +47,14 @@ from soyuz_catalog.api.schemas import (
 from soyuz_catalog.exceptions import InvalidRequestError, NotFoundError
 from soyuz_catalog.models import _now_ms
 from soyuz_catalog.services import (
+    aws_sts,
+    external_location_service,
     model_version_service,
     staging_table_service,
     table_service,
     volume_service,
 )
+from soyuz_catalog.settings import get_settings
 from soyuz_catalog.storage import parse_storage_uri
 
 _logger = logging.getLogger(__name__)
@@ -101,6 +107,79 @@ def _stub_credentials(scheme: str | None) -> TemporaryCredentials:
             expiration_time=expiration,
         )
     return TemporaryCredentials(expiration_time=expiration)
+
+
+def _s3_credentials(session: Session, location: str, operation: str) -> TemporaryCredentials:
+    """Build the ``TemporaryCredentials`` response for an S3 location.
+
+    The ``aws_temp_credentials`` object is real STS output when vending
+    is enabled and the path is governed by a role-bound external
+    location, and an empty stub otherwise — both cases carry the same
+    ``expiration_time`` so a client that caches on it behaves
+    identically.
+
+    Args:
+        session: Active SQLAlchemy session.
+        location: The resolved S3 ``storage_location``.
+        operation: The requested operation, used to label the STS
+            session.
+
+    Returns:
+        TemporaryCredentials: An S3-shaped response, populated or stub.
+    """
+    return TemporaryCredentials(
+        aws_temp_credentials=_mint_aws_credentials(session, location, operation),
+        expiration_time=_now_ms() + _CREDENTIAL_LIFETIME_MS,
+    )
+
+
+def _mint_aws_credentials(session: Session, location: str, operation: str) -> AwsCredentials:
+    """Mint real STS credentials for an S3 path, or an empty stub.
+
+    Returns an empty :class:`AwsCredentials` — preserving the
+    metadata-only default — unless **all** of these hold: STS vending is
+    enabled (``SOYUZ_ENABLE_STS_VENDING``); the path resolves to a
+    registered external location; and that location's credential carries
+    an ``aws_iam_role_arn``. When they do, the role is assumed via STS
+    and the short-lived keys are returned.
+
+    An STS failure (network, denied assume-role, clamped duration) is
+    logged and downgraded to the empty stub rather than raised: the
+    caller can still fall back to its own static configuration, so a
+    vending hiccup degrades gracefully instead of failing the read.
+
+    Args:
+        session: Active SQLAlchemy session.
+        location: The resolved S3 ``storage_location``.
+        operation: The requested operation, used to label the STS
+            session.
+
+    Returns:
+        AwsCredentials: Real STS keys, or an empty stub.
+    """
+    settings = get_settings()
+    if not settings.enable_sts_vending:
+        return AwsCredentials()
+    external_location = external_location_service.resolve_external_location_for_path(
+        session, location
+    )
+    if external_location is None or not external_location.credential.aws_iam_role_arn:
+        return AwsCredentials()
+    try:
+        return aws_sts.assume_role_credentials(
+            role_arn=external_location.credential.aws_iam_role_arn,
+            external_id=external_location.credential.aws_iam_role_external_id,
+            region=settings.sts_region,
+            duration_seconds=settings.sts_credential_duration_seconds,
+            session_name=f"soyuz-{operation.lower()}"[:64],
+        )
+    except Exception:  # noqa: BLE001 — vending is best-effort; degrade to stub
+        _logger.warning(
+            "STS vending failed for %s; returning an empty credential stub",
+            location,
+            exc_info=True,
+        )
+        return AwsCredentials()
 
 
 def generate_table_credentials(
@@ -158,9 +237,15 @@ def generate_table_credentials(
         table = table_service.get_table_by_id(session, payload.table_id)
     except NotFoundError:
         staging = staging_table_service.get_staging_table_by_id(session, payload.table_id)
-        scheme = _resolve_scheme("staging_table", staging.id, staging.staging_location)
+        location = staging.staging_location
+        scheme = _resolve_scheme("staging_table", staging.id, location)
+        if location is not None and scheme in {"s3", "s3a"}:
+            return _s3_credentials(session, location, payload.operation)
         return _stub_credentials(scheme)
-    scheme = _resolve_scheme("table", table.id, table.storage_location)
+    location = table.storage_location
+    scheme = _resolve_scheme("table", table.id, location)
+    if location is not None and scheme in {"s3", "s3a"}:
+        return _s3_credentials(session, location, payload.operation)
     return _stub_credentials(scheme)
 
 
@@ -195,20 +280,24 @@ def generate_volume_credentials(
             "use 'READ_VOLUME' or 'WRITE_VOLUME'",
         )
     volume = volume_service.get_volume_by_id(session, payload.volume_id)
-    scheme = _resolve_scheme("volume", volume.id, volume.storage_location)
+    location = volume.storage_location
+    scheme = _resolve_scheme("volume", volume.id, location)
+    if location is not None and scheme in {"s3", "s3a"}:
+        return _s3_credentials(session, location, payload.operation)
     return _stub_credentials(scheme)
 
 
 def generate_path_credentials(
-    session: Session,  # noqa: ARG001
+    session: Session,
     payload: GenerateTemporaryPathCredential,
 ) -> TemporaryCredentials:
-    """Generate stub temporary credentials for an arbitrary storage path.
+    """Generate temporary credentials for an arbitrary storage path.
 
     Unlike the table/volume variants this endpoint does not resolve a
-    database row — the client supplies the URL directly, so the
-    session parameter is kept only for signature symmetry. The URL is
-    run through :func:`parse_storage_uri` with write-path strictness:
+    database row from an id — the client supplies the URL directly. The
+    session is still used to resolve the governing external location
+    when S3 vending is enabled. The URL is run through
+    :func:`parse_storage_uri` with write-path strictness:
     an unsupported or malformed scheme surfaces as
     ``InvalidRequestError`` → 400, because the client *asked* us to
     vend for this URL and an unparseable one is almost certainly a
@@ -242,6 +331,8 @@ def generate_path_credentials(
         )
     parsed = parse_storage_uri(payload.url)
     _logger.debug("credentials: path %s resolved to scheme=%s", parsed.raw, parsed.scheme)
+    if parsed.scheme in {"s3", "s3a"}:
+        return _s3_credentials(session, payload.url, payload.operation)
     return _stub_credentials(parsed.scheme)
 
 
@@ -288,7 +379,10 @@ def generate_model_version_credentials(
         )
     full_name = f"{payload.catalog_name}.{payload.schema_name}.{payload.model_name}"
     row = model_version_service.get_model_version(session, full_name, payload.version)
-    scheme = _resolve_scheme("model_version", row.id, row.storage_location)
+    location = row.storage_location
+    scheme = _resolve_scheme("model_version", row.id, location)
+    if location is not None and scheme in {"s3", "s3a"}:
+        return _s3_credentials(session, location, payload.operation)
     return _stub_credentials(scheme)
 
 
